@@ -12,6 +12,11 @@
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
     touch-action:manipulation;overflow:hidden}
+  #update-banner{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;transform:translateX(-50%);
+    z-index:200;display:none;align-items:center;gap:12px;padding:9px 12px 9px 14px;
+    border:1px solid rgba(79,195,247,.55);border-radius:14px;background:#16213e;
+    box-shadow:0 8px 28px rgba(0,0,0,.4);font-size:13px;white-space:nowrap}
+  #update-banner button{border:0;border-radius:9px;padding:7px 11px;background:#4fc3f7;color:#04101f;font:700 12px system-ui;cursor:pointer}
   #app{display:flex;gap:16px;padding:16px;height:100vh;box-sizing:border-box;
     overflow:hidden;justify-content:center;align-items:flex-start}
   #game{position:relative;flex:0 0 auto;width:min(420px,50vw);
@@ -29,6 +34,13 @@
     padding:6px 12px;border-radius:8px;font-family:inherit;font-size:13px;
     font-weight:600;cursor:pointer}
   #help-btn:active{background:rgba(255,255,255,0.2)}
+  #settings-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;padding:6px 10px;border-radius:8px;font-family:inherit;font-size:16px;cursor:pointer}
+  #settings{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(4,6,14,.88);backdrop-filter:blur(8px);z-index:120}
+  #settings-card{width:min(360px,100%);background:#16213e;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  #settings-card h2{margin:0 0 16px;font-size:22px}
+  .setting-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:15px}
+  .setting-row input{width:22px;height:22px;accent-color:#4fc3f7}
+  #settings-close{margin-top:18px;width:100%;padding:11px;border:0;border-radius:11px;background:linear-gradient(180deg,#4fc3f7,#2196f3);color:#04101f;font:700 14px system-ui;cursor:pointer}
 
   canvas{display:block;width:100%;height:auto;border-radius:18px;
     touch-action:none;-webkit-user-select:none;-webkit-touch-callout:none;
@@ -120,6 +132,10 @@
 </style>
 </head>
 <body>
+<div id="update-banner" role="status" aria-live="polite">
+  <span>Доступно обновление игры</span>
+  <button id="update-reload" type="button">Обновить</button>
+</div>
 <div id="app">
   <div id="game">
     <div id="hud">
@@ -129,6 +145,7 @@
         <button id="mode-btn" title="Сменить режим и начать заново">4 в ряд</button>
         <button id="leaderboard-btn" title="Таблица рекордов">🏆</button>
         <button id="help-btn" title="Туториал">?</button>
+        <button id="settings-btn" title="Настройки" aria-label="Настройки">⚙️</button>
       </div>
     </div>
     <canvas id="c"></canvas>
@@ -155,6 +172,15 @@
     </div>
     <ol id="leaderboard-list"></ol>
     <button id="leaderboard-close">Закрыть</button>
+  </div>
+</div>
+
+<div id="settings" aria-modal="true" role="dialog" aria-labelledby="settings-title">
+  <div id="settings-card">
+    <h2 id="settings-title">⚙️ Настройки</h2>
+    <label class="setting-row" for="sound-toggle"><span>🔊 Звуковые эффекты</span><input id="sound-toggle" type="checkbox"></label>
+    <label class="setting-row" for="vibration-toggle"><span>📳 Вибрация</span><input id="vibration-toggle" type="checkbox"></label>
+    <button id="settings-close" type="button">Готово</button>
   </div>
 </div>
 
@@ -185,6 +211,7 @@ const INTERSTITIAL_EVERY_N_GAMES = 3;
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
+const APP_BUILD_VERSION = '2026-11-22.3';
 
 /* ============ TELEGRAM INIT ============ */
 if (window.Telegram && window.Telegram.WebApp) {
@@ -195,32 +222,63 @@ if (window.Telegram && window.Telegram.WebApp) {
   } catch(e){}
 }
 
+const SETTINGS_KEYS = { sound:'arrowsTideSoundEnabled', vibration:'arrowsTideVibrationEnabled' };
+function readSetting(key, fallback=true){
+  const saved = localStorage.getItem(key);
+  return saved === null ? fallback : saved === '1';
+}
+let soundEnabled = readSetting(SETTINGS_KEYS.sound, true);
+let vibrationEnabled = readSetting(SETTINGS_KEYS.vibration, true);
+
 function haptic(type){
+  if(!vibrationEnabled) return;
   type = type || 'light';
   if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
     try { window.Telegram.WebApp.HapticFeedback.impactOccurred(type); } catch(e){}
   }
-  if ('vibrate' in navigator) {
+  // Telegram haptics предпочтительнее; navigator.vibrate — запасной вариант вне Telegram.
+  if (!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) && 'vibrate' in navigator) {
     try { navigator.vibrate(type === 'heavy' ? [35,18,55] : type === 'medium' ? 28 : 12); } catch(e){}
   }
 }
 
 let popAudio = null;
-function playLinePop(){
+function unlockGameAudio(){
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if(!AC) return;
     if(!popAudio) popAudio = new AC();
     if(popAudio.state === 'suspended') popAudio.resume();
-    const t = popAudio.currentTime;
-    const osc = popAudio.createOscillator(), gain = popAudio.createGain();
-    osc.type = 'sine'; osc.frequency.setValueAtTime(210,t);
-    osc.frequency.exponentialRampToValueAtTime(58,t+0.13);
-    gain.gain.setValueAtTime(0.0001,t); gain.gain.exponentialRampToValueAtTime(0.32,t+0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001,t+0.19);
-    osc.connect(gain); gain.connect(popAudio.destination); osc.start(t); osc.stop(t+0.2);
   } catch(e){}
 }
+function playLinePop(){
+  if(!soundEnabled) return;
+  try {
+    unlockGameAudio();
+    if(!popAudio || popAudio.state !== 'running') return;
+    const t = popAudio.currentTime;
+    // Короткий «пузырьковый» щелчок с мягким низким хвостом.
+    const osc = popAudio.createOscillator();
+    const sub = popAudio.createOscillator();
+    const gain = popAudio.createGain();
+    const filter = popAudio.createBiquadFilter();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(620, t);
+    osc.frequency.exponentialRampToValueAtTime(170, t + 0.105);
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(185, t);
+    sub.frequency.exponentialRampToValueAtTime(72, t + 0.17);
+    filter.type = 'lowpass'; filter.frequency.setValueAtTime(2400, t);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.24, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+    osc.connect(filter); sub.connect(filter); filter.connect(gain); gain.connect(popAudio.destination);
+    osc.start(t); sub.start(t); osc.stop(t + 0.12); sub.stop(t + 0.20);
+  } catch(e){}
+}
+document.addEventListener('pointerdown', unlockGameAudio, { once:true, passive:true });
+document.addEventListener('touchstart', () => { if(soundEnabled) unlockGameAudio(); }, { once:true, passive:true });
+document.addEventListener('pointerdown', () => { if(soundEnabled) unlockGameAudio(); }, { once:true, passive:true });
 
 /* ============ ADSGRAM INIT ============ */
 let rewardedAdCtl = null;
@@ -442,7 +500,20 @@ function computeTide(){
       const a1 = board[idx(p0.x,p0.y)], a2 = board[idx(p1.x,p1.y)];
       if(a1.color === a2.color && a1.level === a2.level) canMerge = true;
     }
-    if(!canMerge) for(const id of group) state[id] = 'stay';
+    if(!canMerge){
+      // Несколько стрелок могут целиться в одну пустую клетку.
+      // Вместо взаимной блокировки выбираем одну по очереди направлений;
+      // остальные остаются на своих местах и смогут двинуться позже.
+      const rotation = turnCounter % 4;
+      const ordered = group.slice().sort((a,b) => {
+        const pa = posOf[a], pb = posOf[b];
+        const aa = board[idx(pa.x,pa.y)], ab = board[idx(pb.x,pb.y)];
+        const ra = (aa.dir - rotation + 4) % 4;
+        const rb = (ab.dir - rotation + 4) % 4;
+        return ra - rb || a - b;
+      });
+      for(let k=1;k<ordered.length;k++) state[ordered[k]] = 'stay';
+    }
   }
 
   // Pass 3: распространяем блокировку по всей цепочке до устойчивого состояния.
@@ -1360,6 +1431,30 @@ document.getElementById('tut-prev').onclick = prevTut;
 document.getElementById('tut-next').onclick = nextTut;
 document.getElementById('tut-skip').onclick = closeTutorial;
 document.getElementById('help-btn').onclick = openTutorial;
+
+const settingsEl = document.getElementById('settings');
+const soundToggle = document.getElementById('sound-toggle');
+const vibrationToggle = document.getElementById('vibration-toggle');
+function openSettings(){
+  soundToggle.checked = soundEnabled;
+  vibrationToggle.checked = vibrationEnabled;
+  settingsEl.style.display = 'flex';
+}
+function closeSettings(){ settingsEl.style.display = 'none'; }
+document.getElementById('settings-btn').onclick = openSettings;
+document.getElementById('settings-close').onclick = closeSettings;
+settingsEl.addEventListener('click', e => { if(e.target === settingsEl) closeSettings(); });
+soundToggle.addEventListener('change', () => {
+  soundEnabled = soundToggle.checked;
+  localStorage.setItem(SETTINGS_KEYS.sound, soundEnabled ? '1' : '0');
+  if(soundEnabled) unlockGameAudio();
+});
+vibrationToggle.addEventListener('change', () => {
+  vibrationEnabled = vibrationToggle.checked;
+  localStorage.setItem(SETTINGS_KEYS.vibration, vibrationEnabled ? '1' : '0');
+  if(vibrationEnabled) haptic('light');
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && settingsEl.style.display === 'flex') closeSettings(); });
 document.addEventListener('keydown', e=>{
   if(document.getElementById('tutorial').style.display !== 'flex') return;
   if(e.key === 'ArrowRight') nextTut();
@@ -1392,22 +1487,42 @@ function runLogicTests(){
     board=empty(); board[idx(1,1)]={id:1,color:0,level:1,dir:1}; board[idx(2,1)]={id:2,color:1,level:1,dir:3};
     const r=computeTide(); return r.nb[idx(1,1)].dir===3 && r.nb[idx(2,1)].dir===1;
   });
-  test('блокировка после конфликта распространяется по цепочке', () => {
+  test('проигравший конфликт блокирует очередь за собой', () => {
     board=empty();
+    const oldTurn = turnCounter; turnCounter = 3;
     board[idx(0,1)]={id:1,color:0,level:1,dir:1};
     board[idx(1,1)]={id:2,color:1,level:1,dir:1};
-    board[idx(2,1)]={id:3,color:2,level:1,dir:1};
-    board[idx(3,0)]={id:4,color:3,level:1,dir:2};
-    const r=computeTide();
-    return !!r.nb[idx(0,1)] && !!r.nb[idx(1,1)] && !!r.nb[idx(2,1)] && !!r.nb[idx(3,0)] && !r.nb[idx(3,1)];
+    board[idx(3,1)]={id:3,color:2,level:1,dir:3};
+    const r=computeTide(); turnCounter = oldTurn;
+    return !!r.nb[idx(0,1)] && !!r.nb[idx(1,1)] && !!r.nb[idx(2,1)] && !r.nb[idx(3,1)];
   });
   test('слияние одинаковых цвета и уровня', () => {
     board=empty(); board[idx(1,0)]={id:1,color:0,level:2,dir:2}; board[idx(1,2)]={id:2,color:0,level:2,dir:0};
     const r=computeTide(); return r.nb[idx(1,1)]?.level===3;
   });
-  test('столкновение разных стрелок не перезаписывает клетку', () => {
+  test('при конфликте разных стрелок одна занимает общую клетку', () => {
     board=empty(); board[idx(1,0)]={id:1,color:0,level:1,dir:2}; board[idx(1,2)]={id:2,color:1,level:1,dir:0};
-    const r=computeTide(); return !!r.nb[idx(1,0)] && !!r.nb[idx(1,2)] && !r.nb[idx(1,1)];
+    const r=computeTide(); return !!r.nb[idx(1,1)] && (!!r.nb[idx(1,0)] !== !!r.nb[idx(1,2)]);
+  });
+  test('три стрелки в одну клетку: одна входит, две остаются', () => {
+    board=empty();
+    const oldTurn = turnCounter; turnCounter = 0;
+    board[idx(2,1)]={id:1,color:0,level:1,dir:2};
+    board[idx(3,2)]={id:2,color:1,level:1,dir:3};
+    board[idx(2,3)]={id:3,color:2,level:1,dir:0};
+    const r=computeTide(); turnCounter = oldTurn;
+    const center = r.nb[idx(2,2)];
+    const remain = [idx(2,1),idx(3,2),idx(2,3)].filter(i=>r.nb[i]);
+    return !!center && remain.length===2 && r.nb.filter(Boolean).length===3;
+  });
+  test('четыре стрелки с четырёх сторон не блокируют центр навсегда', () => {
+    board=empty();
+    board[idx(2,1)]={id:1,color:0,level:1,dir:2};
+    board[idx(3,2)]={id:2,color:1,level:1,dir:3};
+    board[idx(2,3)]={id:3,color:2,level:1,dir:0};
+    board[idx(1,2)]={id:4,color:3,level:1,dir:1};
+    const r=computeTide();
+    return !!r.nb[idx(2,2)] && [idx(2,1),idx(3,2),idx(2,3),idx(1,2)].filter(i=>r.nb[i]).length===3;
   });
   test('разворот от стены', () => {
     board=empty(); board[idx(0,0)]={id:1,color:0,level:1,dir:0};
@@ -1428,6 +1543,37 @@ function runLogicTests(){
   else console.info('[Стрелки-Прилив] Автотесты пройдены:',results.length);
   return results;
 }
+
+/* ============ TELEGRAM UPDATE CHECK ============ */
+let updateCheckInFlight = false;
+async function checkForGameUpdate(){
+  if(updateCheckInFlight || !navigator.onLine) return;
+  updateCheckInFlight = true;
+  try {
+    const response = await fetch(location.href, { cache:'no-store', headers:{'Cache-Control':'no-cache'} });
+    if(!response.ok) return;
+    const html = await response.text();
+    const match = html.match(/APP_BUILD_VERSION\s*=\s*['\"]([^'\"]+)['\"]/);
+    if(match && match[1] !== APP_BUILD_VERSION){
+      const banner = document.getElementById('update-banner');
+      banner.style.display = 'flex';
+    }
+  } catch(e) {
+    // Проверка обновлений необязательна: игра продолжает работать офлайн.
+  } finally {
+    updateCheckInFlight = false;
+  }
+}
+document.getElementById('update-reload').addEventListener('click', () => {
+  try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light'); } catch(e){}
+  location.reload();
+});
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') checkForGameUpdate();
+});
+window.addEventListener('focus', checkForGameUpdate);
+setTimeout(checkForGameUpdate, 12000);
+setInterval(checkForGameUpdate, 90000);
 
 /* ============ INIT ============ */
 function init(){
