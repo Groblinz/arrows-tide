@@ -24,6 +24,9 @@
   #hud{display:flex;justify-content:space-between;align-items:baseline;
     padding:6px 6px 10px;font-variant-numeric:tabular-nums;gap:8px}
   #score{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  #combo{display:none;margin-left:7px;padding:4px 7px;border-radius:8px;
+    background:rgba(255,213,79,.14);color:#ffd54f;font-size:11px;font-weight:800;
+    vertical-align:middle;white-space:nowrap}
   #best{font-size:13px;opacity:.55}
   #hud-right{display:flex;align-items:center;gap:6px}
   #mode-btn{background:rgba(79,195,247,0.15);border:1px solid rgba(79,195,247,0.45);
@@ -139,7 +142,7 @@
 <div id="app">
   <div id="game">
     <div id="hud">
-      <div id="score">0</div>
+      <div><span id="score">0</span><span id="combo" aria-live="polite"></span></div>
       <div id="hud-right">
         <span id="best">рекорд: 0</span>
         <button id="mode-btn" title="Сменить режим и начать заново">4 в ряд</button>
@@ -211,7 +214,7 @@ const INTERSTITIAL_EVERY_N_GAMES = 3;
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
-const APP_BUILD_VERSION = '2026-11-22.5';
+const APP_BUILD_VERSION = '2026-11-22.7';
 
 /* ============ TELEGRAM INIT ============ */
 if (window.Telegram && window.Telegram.WebApp) {
@@ -375,6 +378,10 @@ let rewardedThisGame = 0;
 let rewardedRequestInFlight = false;
 let targeting = null;
 let turnCounter = 0;
+let comboStreak = 0;
+function comboMultiplier(streak){
+  return streak >= 2 ? 1 + (streak - 1) * 0.10 : 1;
+}
 let rescueActive = false;
 let targetingFromRescue = false;
 
@@ -490,10 +497,12 @@ function computeTide(){
     if(!changed) break;
   }
 
-  // 🔄 NEW: детект встречных пар (A целится в B, B целится в A)
+  // Столкновения одного цвета: готовим слияние и для встречных стрелок.
   const facing = new Set();
+  const mergeInto = new Map(); // id движущейся стрелки -> id стрелки в клетке слияния
+  const checkedFacing = new Set();
   for(const id of ids){
-    if(state[id] !== 'move') continue;
+    if(state[id] !== 'move' || checkedFacing.has(id)) continue;
     const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
     const tx = p.x + d[0], ty = p.y + d[1];
     if(!inB(tx, ty)) continue;
@@ -502,8 +511,16 @@ function computeTide(){
     const tp = posOf[t.id], ta = board[idx(tp.x, tp.y)], td = DIRS[ta.dir];
     const ttx = tp.x + td[0], tty = tp.y + td[1];
     if(ttx === p.x && tty === p.y){
-      facing.add(id);
-      facing.add(t.id);
+      checkedFacing.add(id); checkedFacing.add(t.id);
+      if(a.color === t.color){
+        const survivor = (a.level > t.level || (a.level === t.level && id < t.id)) ? id : t.id;
+        const loser = survivor === id ? t.id : id;
+        state[survivor] = 'stay';
+        state[loser] = 'move';
+        mergeInto.set(loser, survivor);
+      } else {
+        facing.add(id); facing.add(t.id);
+      }
     }
   }
   for(const id of facing) state[id] = 'stay';
@@ -519,12 +536,14 @@ function computeTide(){
   }
   for(const [ti, group] of targets){
     if(group.length < 2) continue;
-    let canMerge = false;
-    if(group.length === 2){
-      const p0 = posOf[group[0]], p1 = posOf[group[1]];
-      const a1 = board[idx(p0.x,p0.y)], a2 = board[idx(p1.x,p1.y)];
-      if(a1.color === a2.color && a1.level === a2.level) canMerge = true;
-    }
+    // Стрелки одного цвета объединяются при столкновении независимо
+    // от уровня; смешанные цвета разрешают конфликт обычным приоритетом.
+    const firstPos = posOf[group[0]];
+    const firstArrow = board[idx(firstPos.x, firstPos.y)];
+    const canMerge = group.length >= 2 && group.every(id => {
+      const p = posOf[id];
+      return board[idx(p.x, p.y)].color === firstArrow.color;
+    });
     if(!canMerge){
       // Несколько стрелок могут целиться в одну пустую клетку.
       // Вместо взаимной блокировки выбираем одну по очереди направлений;
@@ -546,7 +565,7 @@ function computeTide(){
   for(let pass=0; pass<ids.length; pass++){
     let changed = false;
     for(const id of ids){
-      if(state[id] !== 'move') continue;
+      if(state[id] !== 'move' || mergeInto.has(id)) continue;
       const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
       const tx = p.x+d[0], ty = p.y+d[1];
       if(!inB(tx,ty)) continue;
@@ -554,6 +573,20 @@ function computeTide(){
       if(t && state[t.id] === 'stay'){ state[id] = 'stay'; changed = true; }
     }
     if(!changed) break;
+  }
+
+  // Если стрелка упёрлась в стоящую стрелку того же цвета — тоже сливаем.
+  // Это покрывает столкновения с препятствием, а не только общий пункт назначения.
+  for(const id of ids){
+    if(state[id] !== 'stay' || mergeInto.has(id)) continue;
+    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+    const tx = p.x + d[0], ty = p.y + d[1];
+    if(!inB(tx, ty)) continue;
+    const target = board[idx(tx, ty)];
+    if(!target || target.color !== a.color || state[target.id] !== 'stay') continue;
+    // Движущаяся стрелка становится участником слияния в клетке цели.
+    state[id] = 'move';
+    mergeInto.set(id, target.id);
   }
 
   const nb = board.map(a=>a?{...a}:null);
@@ -570,18 +603,48 @@ function computeTide(){
     if(!tg.has(ti)) tg.set(ti, []);
     tg.get(ti).push(id);
   }
+  // Включаем в группу неподвижные стрелки, в которые врезались стрелки того же цвета.
+  for(const [moverId, targetId] of mergeInto){
+    const tp = posOf[targetId];
+    if(!tp) continue;
+    const ti = idx(tp.x, tp.y);
+    if(!tg.has(ti)) tg.set(ti, []);
+    if(!tg.get(ti).includes(targetId)) tg.get(ti).push(targetId);
+  }
   for(const [ti, group] of tg){
     const tx = ti%N, ty = (ti/N)|0;
     if(group.length === 1){
       const id = group[0], p = posOf[id], a = board[idx(p.x,p.y)];
       nb[ti] = {id, color:a.color, level:a.level, dir:a.dir};
       anims.push({from:p, to:{x:tx,y:ty}, color:a.color, level:a.level, dir:a.dir});
-    } else if(group.length === 2){
-      const p0 = posOf[group[0]], p1 = posOf[group[1]];
-      const a1 = board[idx(p0.x,p0.y)];
-      nb[ti] = {id:group[0], color:a1.color, level:a1.level+1, dir:a1.dir};
-      anims.push({from:p0, to:{x:tx,y:ty}, color:a1.color, level:a1.level+1, dir:a1.dir});
-      fades.push({x:p1.x, y:p1.y, color:a1.color, level:a1.level});
+    } else if(group.length >= 2){
+      const members = group.map(id => {
+        const p = posOf[id];
+        return {id, p, arrow:board[idx(p.x,p.y)]};
+      });
+      // Сохраняем стрелку с наибольшим уровнем; при равенстве — первую.
+      members.sort((a,b) => b.arrow.level - a.arrow.level || a.id - b.id);
+      const survivor = members[0];
+      const mergedLevel = survivor.arrow.level + 1;
+      nb[ti] = {
+        id:survivor.id,
+        color:survivor.arrow.color,
+        level:mergedLevel,
+        dir:survivor.arrow.dir
+      };
+      anims.push({
+        from:survivor.p, to:{x:tx,y:ty},
+        color:survivor.arrow.color, level:mergedLevel, dir:survivor.arrow.dir
+      });
+      for(let k=1;k<members.length;k++){
+        const m = members[k];
+        fades.push({x:m.p.x, y:m.p.y, color:m.arrow.color, level:m.arrow.level});
+      }
+      events.push({
+        cls:'log-merge',
+        text:'🔥 Слияние: ' + members.length + ' стрелки ' +
+          COLOR_NAMES[survivor.arrow.color] + ' → ур.' + mergedLevel
+      });
     }
   }
 
@@ -603,16 +666,6 @@ function computeTide(){
     } else if(!nb[idx(p.x,p.y)]){
       nb[idx(p.x,p.y)] = {...a};
       anims.push({from:p, to:p, color:a.color, level:a.level, dir:a.dir});
-    }
-  }
-
-  // Лог merge
-  for(const id of ids){
-    if(state[id] !== 'move') continue;
-    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
-    const f = nb[idx(p.x+d[0], p.y+d[1])];
-    if(f && f.level > a.level){
-      events.push({cls:'log-merge', text:'🔥 Слияние: ' + COLOR_NAMES[a.color] + ' ур.' + a.level + ' ' + posStr(p) + (f.id===id ? ' → стало ур.'+f.level : ' поглощена')});
     }
   }
 
@@ -922,6 +975,8 @@ function handleDone(a){
     board = a.nb;
     const li = findLines(board, lineMode);
     if(li.cells.size){
+      comboStreak++;
+      const streakMultiplier = comboMultiplier(comboStreak);
       let total = 0;
       for(const ln of li.lines){
         const sc = scoreLine(ln.cells, lineMode, board);
@@ -941,11 +996,23 @@ function handleDone(a){
         pops.push({x:i%N, y:(i/N)|0, color:ar.color, level:ar.level, dir:ar.dir});
         board[i] = null;
       }
-      addScore(total);
+      const awarded = Math.round(total * streakMultiplier);
+      if(comboStreak >= 2){
+        logEvent('🔥 Серия сборок #' + comboStreak + ': +' +
+          Math.round((streakMultiplier - 1) * 100) + '% бонус, итог +' + awarded,
+          'log-bonus');
+      }
+      addScore(awarded);
       haptic('heavy');
       playLinePop();
       anim = {active:true, kind:'pop', t:0, dur:0.42, pops};
-    } else { logEvent('✓ Ход завершён', 'log-system'); endTurn(); }
+    } else {
+      if(comboStreak > 0) logEvent('Серия сборок прервана', 'log-system');
+      comboStreak = 0;
+      updateHud();
+      logEvent('✓ Ход завершён', 'log-system');
+      endTurn();
+    }
   } else if(a.kind==='pop') endTurn();
 }
 
@@ -1259,6 +1326,16 @@ cvs.addEventListener('pointercancel', ()=>{ drag = null; }, { passive: false });
 function updateHud(){
   document.getElementById('score').textContent = score;
   document.getElementById('best').textContent = 'рекорд: ' + best;
+  const comboEl = document.getElementById('combo');
+  if(comboEl){
+    if(comboStreak >= 2){
+      comboEl.style.display = 'inline-block';
+      comboEl.textContent = 'СЕРИЯ ×' + comboMultiplier(comboStreak).toFixed(1);
+    } else {
+      comboEl.style.display = 'none';
+      comboEl.textContent = '';
+    }
+  }
 }
 
 /* ============ TUTORIAL ============ */
@@ -1531,9 +1608,22 @@ function runLogicTests(){
     const r=computeTide(); turnCounter = oldTurn;
     return !!r.nb[idx(0,1)] && !!r.nb[idx(1,1)] && !!r.nb[idx(2,1)] && !r.nb[idx(3,1)];
   });
-  test('слияние одинаковых цвета и уровня', () => {
-    board=empty(); board[idx(1,0)]={id:1,color:0,level:2,dir:2}; board[idx(1,2)]={id:2,color:0,level:2,dir:0};
-    const r=computeTide(); return r.nb[idx(1,1)]?.level===3;
+  test('слияние одинакового цвета работает при разных уровнях', () => {
+    board=empty();
+    board[idx(1,0)]={id:1,color:0,level:1,dir:2};
+    board[idx(1,2)]={id:2,color:0,level:4,dir:0};
+    const r=computeTide();
+    return r.nb[idx(1,1)]?.color===0 && r.nb[idx(1,1)]?.level===5 &&
+      r.nb.filter(Boolean).length===1;
+  });
+  test('три стрелки одного цвета объединяются независимо от уровней', () => {
+    board=empty();
+    board[idx(2,1)]={id:1,color:2,level:1,dir:2};
+    board[idx(3,2)]={id:2,color:2,level:3,dir:3};
+    board[idx(2,3)]={id:3,color:2,level:2,dir:0};
+    const r=computeTide();
+    return r.nb[idx(2,2)]?.color===2 && r.nb[idx(2,2)]?.level===4 &&
+      r.nb.filter(Boolean).length===1;
   });
   test('при конфликте разных стрелок одна занимает общую клетку', () => {
     board=empty(); board[idx(1,0)]={id:1,color:0,level:1,dir:2}; board[idx(1,2)]={id:2,color:1,level:1,dir:0};
@@ -1566,6 +1656,10 @@ function runLogicTests(){
   test('линия определяется по цвету', () => {
     board=empty(); for(let x=0;x<4;x++) board[idx(x,4)]={id:x+1,color:2,level:x+1,dir:1};
     const l=findLines(board,4); return l.lines.length===1 && l.cells.size===4;
+  });
+  test('бонус серии: 0%, 10%, 20%, 30%', () => {
+    return comboMultiplier(1)===1 && comboMultiplier(2)===1.1 &&
+      comboMultiplier(3)===1.2 && comboMultiplier(4)===1.3;
   });
   test('уровень увеличивает очки линии', () => {
     board=empty(); for(let x=0;x<4;x++) board[idx(x,0)]={id:x+1,color:0,level:x===0?3:1,dir:1};
@@ -1615,6 +1709,7 @@ function init(){
   board = new Array(N*N).fill(null);
   pieces = [newPiece(), newPiece(), newPiece()];
   score = 0; nextId = 1; gameOver = false; drag = null;
+  comboStreak = 0;
   anim = {active:false};
   powerups = { bomb: 0, firework: 0, eraser: 0 };
   rewardedThisGame = 0;
