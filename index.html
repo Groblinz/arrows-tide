@@ -214,7 +214,7 @@ const INTERSTITIAL_EVERY_N_GAMES = 3;
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
-const APP_BUILD_VERSION = '2026-11-22.7';
+const APP_BUILD_VERSION = '2026-11-22.8';
 
 /* ============ TELEGRAM INIT ============ */
 if (window.Telegram && window.Telegram.WebApp) {
@@ -328,21 +328,27 @@ function showInterstitialAd(){
 }
 
 /* ============ КОНСТАНТЫ ИГРЫ ============ */
-const N = 6, CELL = 56, W = N * CELL, TRAY = 110, PU_ROW = 84;
-const H = W + TRAY + PU_ROW;
+let N = 6, CELL = 56, W = N * CELL;
+const TRAY = 110, PU_ROW = 104;
+let H = W + TRAY + PU_ROW;
 const COLORS = [[79,195,247],[255,138,101],[174,213,129],[186,104,200]];
 const COLOR_NAMES = ['голубой','оранжевый','зелёный','фиолетовый'];
 const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
-const PU_KEYS = ['bomb','firework','eraser'];
-const PU_ICONS = ['💣','🎆','🎨'];
-const PU_LABELS = ['Бомба','Фейерверк','Кисть'];
+const PU_KEYS = ['bomb','rotate180','rotateCW','rotateCCW','move'];
+const PU_ICONS = ['💣','↕️','↻','↺','✥'];
+const PU_LABELS = ['Бомба','180°','Вправо','Влево','Перенос'];
 
 const cvs = document.getElementById('c');
 const ctx = cvs.getContext('2d');
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
-cvs.width = W * DPR; cvs.height = H * DPR;
-cvs.style.aspectRatio = W + '/' + H;
-ctx.scale(DPR, DPR);
+function resizeGameCanvas(){
+  N = lineMode === 4 ? 8 : 6;
+  CELL = N === 8 ? 48 : 56;
+  W = N * CELL; H = W + TRAY + PU_ROW;
+  cvs.width = W * DPR; cvs.height = H * DPR;
+  cvs.style.aspectRatio = W + '/' + H;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
 
 const idx = (x,y) => y*N + x;
 const inB = (x,y) => x>=0 && y>=0 && x<N && y<N;
@@ -373,10 +379,10 @@ function readBest(mode){
 }
 let anim = { active: false };
 let drag = null, gameOver = false;
-let powerups = { bomb: 0, firework: 0, eraser: 0 };
+let powerups = { bomb: 3, rotate180: 3, rotateCW: 3, rotateCCW: 3, move: 3 };
 let rewardedThisGame = 0;
 let rewardedRequestInFlight = false;
-let targeting = null;
+let targeting = null, moveSource = null;
 let turnCounter = 0;
 let comboStreak = 0;
 function comboMultiplier(streak){
@@ -752,7 +758,7 @@ function addScore(pts){
   updateHud();
 }
 
-function anyPowerupAvailable(){ return powerups.bomb>0 || powerups.firework>0 || powerups.eraser>0; }
+function anyPowerupAvailable(){ return PU_KEYS.some(k => powerups[k] > 0); }
 function canWatchAd(){ return !!rewardedAdCtl && !rewardedRequestInFlight && rewardedThisGame < MAX_REWARDED_PER_GAME; }
 
 function endTurn(){
@@ -883,7 +889,7 @@ function realGameOver(){
 function showRescue(){
   const btns = document.getElementById('rescueBtns');
   btns.innerHTML = '';
-  for(let i=0;i<3;i++){
+  for(let i=0;i<PU_KEYS.length;i++){
     const key = PU_KEYS[i];
     const count = powerups[key];
     const canWatchThis = count === 0 && canWatchAd();
@@ -920,8 +926,8 @@ function hideRescue(){ document.getElementById('rescue').style.display = 'none';
 function pickRescue(key){
   hideRescue();
   rescueActive = false;
-  if(key === 'firework'){ targetingFromRescue = false; applyFirework(); }
-  else { targeting = key; targetingFromRescue = true; logEvent('🎯 Спасение: ' + PU_ICONS[PU_KEYS.indexOf(key)] + ' — выбери цель', 'log-powerup'); }
+  targeting = key; moveSource = null; targetingFromRescue = true;
+  logEvent('🎯 Спасение: ' + PU_ICONS[PU_KEYS.indexOf(key)] + ' — выбери стрелку на поле', 'log-powerup');
 }
 
 document.getElementById('rescueGiveUp').onclick = () => {
@@ -1018,11 +1024,10 @@ function handleDone(a){
 
 /* ============ POWERUPS ============ */
 function hitPowerup(x,y){
-  const slotW = W/3, cy = W + TRAY + PU_ROW/2;
-  for(let i=0;i<3;i++){
-    const cx = slotW*(i+0.5);
-    const dx = x-cx, dy = y-cy;
-    if(dx*dx+dy*dy < 42*42) return i;
+  const slotW = W/PU_KEYS.length, cy = W + TRAY + PU_ROW/2;
+  for(let i=0;i<PU_KEYS.length;i++){
+    const cx = slotW*(i+0.5), dx=x-cx, dy=y-cy;
+    if(dx*dx+dy*dy < 30*30) return i;
   }
   return -1;
 }
@@ -1030,30 +1035,18 @@ function hitPowerup(x,y){
 function handlePowerupTap(i){
   const key = PU_KEYS[i];
   if(powerups[key] <= 0){
-    // Пытаемся получить за рекламу
     if(!canWatchAd()){
-      logEvent('⚠️ ' + PU_ICONS[i] + ' нет, реклама исчерпана (' + MAX_REWARDED_PER_GAME + '/раунд)', 'log-system');
+      logEvent('⚠️ ' + PU_ICONS[i] + ' нет, реклама недоступна или лимит исчерпан', 'log-system');
       return;
     }
-    requestPowerupViaAd(key, () => {
-      logEvent('✅ Получен ' + PU_ICONS[i] + ' — используй его', 'log-ad');
-    }, (r) => {
-      logEvent('⚠️ ' + (r==='limit'?'Лимит рекламы':'Не удалось получить'), 'log-system');
-    });
+    requestPowerupViaAd(key, () => logEvent('✅ Получен ' + PU_ICONS[i] + ' — используй его', 'log-ad'));
     return;
   }
-  if(key === 'firework'){
-    if(rescueActive){ hideRescue(); rescueActive = false; }
-    targeting = null; applyFirework(); return;
-  }
-  if(targeting === key){
-    targeting = null;
-    if(targetingFromRescue){ targetingFromRescue = false; rescueActive = true; showRescue(); }
-  } else {
-    targeting = key;
-    if(rescueActive){ hideRescue(); rescueActive = false; }
-    targetingFromRescue = false;
-  }
+  if(targeting === key){ targeting=null; moveSource=null; return; }
+  targeting = key; moveSource = null;
+  targetingFromRescue = false;
+  const hint = key==='bomb' ? 'Выбери центр взрыва' : key==='move' ? 'Выбери стрелку, затем пустую клетку' : 'Выбери стрелку на поле';
+  logEvent('🎯 ' + PU_ICONS[i] + ' ' + hint, 'log-powerup');
 }
 
 function applyBomb(cx,cy){
@@ -1072,58 +1065,51 @@ function applyBomb(cx,cy){
     return;
   }
   targetingFromRescue = false;
-  targeting = null; powerups.bomb--;
+  targeting = null; moveSource=null; powerups.bomb--;
   addScore(pops.length * 8);
   haptic('heavy');
   logEvent('💣 Уничтожено ' + pops.length, 'log-pop');
   anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
 }
 
-function applyEraser(cx,cy){
-  const t = board[idx(cx,cy)];
-  if(!t) return;
-  const c2 = t.color;
-  const pops = [];
-  for(let i=0;i<N*N;i++){
-    if(board[i] && board[i].color === c2){
-      const a = board[i];
-      pops.push({x:i%N, y:(i/N)|0, color:a.color, level:a.level, dir:a.dir});
-      board[i] = null;
-    }
-  }
-  targetingFromRescue = false; targeting = null; powerups.eraser--;
-  addScore(pops.length * 8);
-  haptic('heavy');
-  logEvent('🎨 Стёрто ' + pops.length + ' (' + COLOR_NAMES[c2] + ')', 'log-pop');
-  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+function applyArrowTransform(cx,cy,key){
+  const i=idx(cx,cy), a=board[i];
+  if(!a) return false;
+  if(key==='rotate180') a.dir=(a.dir+2)%4;
+  else if(key==='rotateCW') a.dir=(a.dir+1)%4;
+  else if(key==='rotateCCW') a.dir=(a.dir+3)%4;
+  else return false;
+  powerups[key]--; targeting=null; targetingFromRescue=false;
+  haptic('medium');
+  logEvent('🔄 Стрелка повёрнута: ' + PU_LABELS[PU_KEYS.indexOf(key)], 'log-powerup');
+  return true;
 }
 
-function applyFirework(){
-  if(powerups.firework <= 0) return;
-  const occ = [];
-  for(let i=0;i<N*N;i++) if(board[i]) occ.push(i);
-  if(occ.length === 0) return;
-  const cnt = Math.min(9, occ.length);
-  const pops = [];
-  for(let k=0;k<cnt;k++){
-    const j = (Math.random()*occ.length)|0;
-    const i = occ.splice(j,1)[0];
-    const a = board[i];
-    pops.push({x:i%N, y:(i/N)|0, color:a.color, level:a.level, dir:a.dir});
-    board[i] = null;
+function applyMove(cx,cy){
+  if(!moveSource){
+    const a=board[idx(cx,cy)];
+    if(!a) return;
+    moveSource={x:cx,y:cy};
+    logEvent('📍 Теперь выбери пустую клетку для переноса', 'log-powerup');
+    return;
   }
-  targetingFromRescue = false; powerups.firework--;
-  addScore(pops.length * 8);
-  haptic('heavy');
-  logEvent('🎆 Уничтожено ' + pops.length, 'log-pop');
-  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+  if(cx===moveSource.x && cy===moveSource.y){ moveSource=null; return; }
+  const dest=idx(cx,cy);
+  if(board[dest]) return;
+  const src=idx(moveSource.x,moveSource.y);
+  board[dest]=board[src]; board[src]=null;
+  powerups.move--; targeting=null; moveSource=null; targetingFromRescue=false;
+  haptic('medium');
+  logEvent('✥ Стрелка перемещена в выбранную клетку', 'log-powerup');
 }
 
 function handleTargetTap(x,y){
   const cx = Math.floor(x/CELL), cy = Math.floor(y/CELL);
   if(!inB(cx,cy)) return;
   if(targeting === 'bomb') applyBomb(cx,cy);
-  else if(targeting === 'eraser' && board[idx(cx,cy)]) applyEraser(cx,cy);
+  else if(targeting === 'move') applyMove(cx,cy);
+  else if(['rotate180','rotateCW','rotateCCW'].includes(targeting)) applyArrowTransform(cx,cy,targeting);
+  if(targetingFromRescue && !targeting){ hideRescue(); rescueActive=false; }
 }
 
 /* ============ DRAW ============ */
@@ -1168,34 +1154,26 @@ function drawPowerupGlyph(g, type, cx, cy, size){
 }
 
 function drawPowerups(){
-  const slotW = W/3, cy = W + TRAY + PU_ROW/2, R = 30;
-  for(let i=0;i<3;i++){
-    const key = PU_KEYS[i];
-    const cx = slotW*(i+0.5);
-    const cnt = powerups[key];
-    const avail = cnt > 0;
-    const canAd = cnt === 0 && canWatchAd();
-    const isT = targeting === key;
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
-    if(isT){ ctx.fillStyle='rgba(79,195,247,0.35)'; ctx.strokeStyle='rgba(79,195,247,0.95)'; }
-    else if(avail){ ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.strokeStyle='rgba(255,255,255,0.25)'; }
-    else if(canAd){ ctx.fillStyle='rgba(255,213,79,0.15)'; ctx.strokeStyle='rgba(255,213,79,0.55)'; }
-    else { ctx.fillStyle='rgba(255,255,255,0.03)'; ctx.strokeStyle='rgba(255,255,255,0.08)'; }
-    ctx.fill(); ctx.lineWidth=2; ctx.stroke();
-    ctx.save(); ctx.globalAlpha = (avail || canAd) ? 1 : 0.3;
-    drawPowerupGlyph(ctx, i, cx, cy+1, 38);
-    ctx.restore();
+  const slotW = W/PU_KEYS.length, cy = W + TRAY + PU_ROW/2, R = 23;
+  for(let i=0;i<PU_KEYS.length;i++){
+    const key=PU_KEYS[i], cx=slotW*(i+0.5), cnt=powerups[key];
+    const avail=cnt>0, canAd=cnt===0 && canWatchAd(), isT=targeting===key;
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
+    if(isT){ctx.fillStyle='rgba(79,195,247,.35)';ctx.strokeStyle='rgba(79,195,247,.95)';}
+    else if(avail){ctx.fillStyle='rgba(255,255,255,.10)';ctx.strokeStyle='rgba(255,255,255,.25)';}
+    else if(canAd){ctx.fillStyle='rgba(255,213,79,.15)';ctx.strokeStyle='rgba(255,213,79,.55)';}
+    else{ctx.fillStyle='rgba(255,255,255,.03)';ctx.strokeStyle='rgba(255,255,255,.08)';}
+    ctx.fill();ctx.lineWidth=2;ctx.stroke();
+    ctx.save();ctx.globalAlpha=(avail||canAd)?1:.3;
+    ctx.font='bold 25px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#e8eefc';ctx.fillText(PU_ICONS[i],cx,cy+1);ctx.restore();
+    ctx.font='10px system-ui';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle='rgba(232,238,252,.8)';ctx.fillText(PU_LABELS[i],cx,cy+R+3);
     if(cnt>0){
-      ctx.beginPath(); ctx.arc(cx+R*0.72, cy-R*0.72, 12, 0, Math.PI*2);
-      ctx.fillStyle = isT ? '#2196f3' : '#ff6b6b'; ctx.fill();
-      ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(cnt, cx+R*0.72, cy-R*0.72);
+      ctx.beginPath();ctx.arc(cx+R*.78,cy-R*.78,9,0,Math.PI*2);ctx.fillStyle=isT?'#2196f3':'#ff6b6b';ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cnt,cx+R*.78,cy-R*.78);
     } else if(canAd){
-      ctx.beginPath(); ctx.arc(cx+R*0.72, cy-R*0.72, 12, 0, Math.PI*2);
-      ctx.fillStyle = '#ffd54f'; ctx.fill();
-      ctx.font = 'bold 11px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillStyle = '#04101f';
-      ctx.fillText('📺', cx+R*0.72, cy-R*0.72);
+      ctx.beginPath();ctx.arc(cx+R*.78,cy-R*.78,9,0,Math.PI*2);ctx.fillStyle='#ffd54f';ctx.fill();
+      ctx.fillStyle='#04101f';ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('AD',cx+R*.78,cy-R*.78);
     }
   }
 }
@@ -1237,7 +1215,7 @@ function draw(){
   }
   drawPowerups();
   if(targeting){
-    const text = targeting === 'bomb' ? '💣 Куда ударить?' : '🎨 Какой цвет?';
+    const text = targeting === 'bomb' ? '💣 Выбери центр взрыва' : targeting === 'move' ? (moveSource ? '✥ Выбери пустую клетку' : '✥ Выбери стрелку') : '🔄 Выбери стрелку';
     ctx.font='bold 13px system-ui'; const tw = ctx.measureText(text).width + 24;
     rrect(ctx, W/2-tw/2, 6, tw, 26, 13);
     ctx.fillStyle='rgba(79,195,247,0.9)'; ctx.fill();
@@ -1379,7 +1357,7 @@ const TUT_SLIDES = [
     }
     drawArrowG(g, 150, TUT_H/2, 50, COLORS[0], dir, 1);
   }},
-  { title: '🔥 Слияние', text: 'Две одинаковые стрелки (цвет + уровень), придя в одну клетку, сливаются. Уровень растёт: 1+1→2.', draw(g,t){
+  { title: '🔥 Слияние', text: 'Стрелки одного цвета сливаются при столкновении, даже если уровни разные. Остаётся стрелка с наибольшим уровнем, который увеличивается на 1. Разные цвета не сливаются.', draw(g,t){
     const c = t % 3;
     let ax = 75, bx = 125, bxa = 1, lvl = 1;
     if(c >= 0.5 && c < 1.5){ const p = (c - 0.5) / 1.0; ax = 75 + 25 * p; bx = 125 - 25 * p; }
@@ -1388,7 +1366,7 @@ const TUT_SLIDES = [
     if(bxa > 0.01) drawArrowG(g, bx, TUT_H/2, 50, COLORS[0], 3, 1, bxa);
     drawArrowG(g, ax, TUT_H/2, 50, COLORS[0], 1, lvl);
   }},
-  { title: '🔄 Разворот', text: 'Если две стрелки смотрят друг в друга — обе разворачиваются в обратных направлениях. Никто не блокируется навсегда.', draw(g,t){
+  { title: '🔄 Встречное движение', text: 'Если стрелки разных цветов встречаются лоб в лоб, они разворачиваются и продолжают движение в обратных направлениях. Столкновение стрелок одного цвета может привести к слиянию.', draw(g,t){
     const c = t % 3;
     let ax = 75, bx = 125, adir = 1, bdir = 3;
     if(c >= 0.5 && c < 1.5){
@@ -1407,7 +1385,7 @@ const TUT_SLIDES = [
     get title(){ return '💥 Линия из ' + lineMode; },
     get text(){
       const total = lineMode * 12;
-      return lineMode + ' одинаковых по цвету и направлению стрелок в ряд лопаются. Базовые очки за клетку + бонус за длину линии и уровень стрелки.';
+      return lineMode + ' стрелки одного цвета и направления в ряд или столбец лопаются. Уровень стрелок даёт дополнительные очки. В режиме 3 в ряд поле 6×6, в режиме 4 в ряд — 8×8.';
     },
     draw(g, t){
       const c = t % 3;
@@ -1449,21 +1427,21 @@ const TUT_SLIDES = [
       }
     }
   },
-  { title: '🎁 Пауэрапы', text: '💣 Бомба 3×3 · 🎆 Фейерверк — до 9 случайных · 🎨 Кисть — все стрелки одного цвета. Пауэрапы можно получить за просмотр доступной рекламы (макс. 5 за игру); за очки они не выдаются.', draw(g,t){
+  { title: '🎁 Пауэрапы', text: 'В начале каждой новой игры доступно по 3 использования каждой способности: 💣 взрыв клеток в области 3×3; ↕️ разворот стрелки на 180°; ↻ поворот вправо на 90°; ↺ поворот влево на 90°; ✥ перенос стрелки в выбранную пустую клетку. Когда запас закончится, можно получить дополнительное использование за рекламу.', draw(g,t){
     const pulse = 0.5 + 0.5 * Math.sin(t * 2);
-    const icons = ['💣', '🎆', '🎨']; const clr = ['#ff9800', '#e040fb', '#4fc3f7'];
-    for(let i=0;i<3;i++){
-      const x = TUT_W * (i + 0.5) / 3;
-      g.beginPath(); g.arc(x, TUT_H/2, 32, 0, Math.PI*2);
+    const icons = ['💣', '↕️', '↻', '↺', '✥'];
+    const clr = ['#ff9800', '#4fc3f7', '#81c784', '#ba68c8', '#ffd54f'];
+    for(let i=0;i<5;i++){
+      const x = TUT_W * (i + 0.5) / 5;
+      g.beginPath(); g.arc(x, TUT_H/2, 18, 0, Math.PI*2);
       g.fillStyle = 'rgba(255,255,255,' + (0.08 + 0.12*pulse) + ')'; g.fill();
       g.strokeStyle = clr[i]; g.lineWidth = 2; g.stroke();
-      g.font = '32px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = '#fff'; g.fillText(icons[i], x, TUT_H/2 + 2);
-      // Бейдж "📺"
-      g.beginPath(); g.arc(x + 22, TUT_H/2 - 22, 12, 0, Math.PI*2);
+      g.font = '22px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#fff'; g.fillText(icons[i], x, TUT_H/2 + 1);
+      g.beginPath(); g.arc(x + 13, TUT_H/2 - 13, 7, 0, Math.PI*2);
       g.fillStyle = '#ffd54f'; g.fill();
-      g.font = '11px system-ui'; g.fillStyle = '#04101f';
-      g.fillText('📺', x + 22, TUT_H/2 - 22);
+      g.font = 'bold 9px system-ui'; g.fillStyle = '#04101f';
+      g.fillText('3', x + 13, TUT_H/2 - 13);
     }
   }},
   { title: '🚨 Спасение', text: 'Если ходов нет — используй накопленный пауэрап или получи один за доступный просмотр рекламы (макс. 5 за игру).', draw(g,t){
@@ -1480,7 +1458,7 @@ const TUT_SLIDES = [
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('🚨 Ходов нет!', TUT_W/2, TUT_H/2 - 25);
     g.font = '24px system-ui'; g.fillStyle = '#fff';
-    g.fillText('💣   🎆   🎨', TUT_W/2, TUT_H/2 + 10);
+    g.fillText('💣 ↕️ ↻ ↺ ✥', TUT_W/2, TUT_H/2 + 10);
     g.font = '11px system-ui'; g.fillStyle = 'rgba(255,255,255,0.7)';
     g.fillText('📺 Получить за рекламу', TUT_W/2, TUT_H/2 + 40);
   }}
@@ -1706,12 +1684,13 @@ setInterval(checkForGameUpdate, 90000);
 
 /* ============ INIT ============ */
 function init(){
+  resizeGameCanvas();
   board = new Array(N*N).fill(null);
   pieces = [newPiece(), newPiece(), newPiece()];
   score = 0; nextId = 1; gameOver = false; drag = null;
   comboStreak = 0;
   anim = {active:false};
-  powerups = { bomb: 0, firework: 0, eraser: 0 };
+  powerups = { bomb: 3, rotate180: 3, rotateCW: 3, rotateCCW: 3, move: 3 };
   rewardedThisGame = 0;
   rewardedRequestInFlight = false;
   targeting = null; turnCounter = 0;
