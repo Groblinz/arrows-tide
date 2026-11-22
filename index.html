@@ -19,25 +19,21 @@
   #update-banner button{border:0;border-radius:9px;padding:7px 11px;background:#4fc3f7;color:#04101f;font:700 12px system-ui;cursor:pointer}
   #app{display:flex;gap:16px;padding:16px;height:100vh;box-sizing:border-box;
     overflow:hidden;justify-content:center;align-items:flex-start}
-  #game{position:relative;flex:0 0 auto;width:min(420px,50vw);
+  #game{position:relative;flex:0 0 auto;width:min(520px,56vw);
     display:flex;flex-direction:column}
   #hud{display:flex;justify-content:space-between;align-items:baseline;
     padding:6px 6px 10px;font-variant-numeric:tabular-nums;gap:8px}
-  #score{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  #score{font-size:34px;font-weight:800;letter-spacing:-.5px}
   #combo{display:none;margin-left:7px;padding:4px 7px;border-radius:8px;
     background:rgba(255,213,79,.14);color:#ffd54f;font-size:11px;font-weight:800;
     vertical-align:middle;white-space:nowrap}
-  #best{font-size:13px;opacity:.55}
+  #best{font-size:15px;opacity:.65}
   #hud-right{display:flex;align-items:center;gap:6px}
-  #mode-btn{background:rgba(79,195,247,0.15);border:1px solid rgba(79,195,247,0.45);
-    color:#4fc3f7;padding:6px 12px;border-radius:8px;font-family:inherit;
-    font-size:13px;font-weight:600;cursor:pointer}
-  #mode-btn:active{background:rgba(79,195,247,0.3)}
-  #help-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;
-    padding:6px 12px;border-radius:8px;font-family:inherit;font-size:13px;
-    font-weight:600;cursor:pointer}
+#help-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;
+    padding:8px 13px;border-radius:9px;font-family:inherit;font-size:14px;
+    font-weight:700;cursor:pointer}
   #help-btn:active{background:rgba(255,255,255,0.2)}
-  #settings-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;padding:6px 10px;border-radius:8px;font-family:inherit;font-size:16px;cursor:pointer}
+  #settings-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;padding:8px 12px;border-radius:9px;font-family:inherit;font-size:19px;cursor:pointer}
   #settings{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(4,6,14,.88);backdrop-filter:blur(8px);z-index:120}
   #settings-card{width:min(360px,100%);background:#16213e;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
   #settings-card h2{margin:0 0 16px;font-size:22px}
@@ -80,16 +76,17 @@
     cursor:pointer;font-family:inherit;margin-top:8px}
 
   #leaderboard-btn{background:rgba(255,255,255,.1);border:0;color:#e8eefc;
-    padding:6px 10px;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+    padding:8px 12px;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
   #leaderboard{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
     padding:16px;background:rgba(4,6,14,.88);backdrop-filter:blur(8px);z-index:110}
   #leaderboard-card{width:min(420px,100%);max-height:85vh;overflow:auto;background:#16213e;
     border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
   #leaderboard-card h2{margin:0 0 14px;font-size:22px}
-  #leaderboard-tabs{display:flex;gap:8px;margin:0 0 12px}
-  .leaderboard-tab{flex:1;padding:9px 10px;border:1px solid rgba(79,195,247,.25);
+  .leaderboard-section-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.55;margin:10px 0 6px}
+  .leaderboard-tabs{display:flex;gap:7px;margin:0 0 10px}
+  .leaderboard-tab{flex:1;min-width:0;padding:9px 6px;border:1px solid rgba(79,195,247,.25);
     border-radius:10px;background:rgba(255,255,255,.05);color:#e8eefc;
-    font:600 13px system-ui;cursor:pointer}
+    font:600 11px system-ui;cursor:pointer}
   .leaderboard-tab.active{background:rgba(79,195,247,.2);border-color:#4fc3f7;color:#4fc3f7}
   #leaderboard-list{margin:0;padding:0;list-style:none;display:grid;gap:8px}
   #leaderboard-list li{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;
@@ -124,9 +121,12 @@
     color:rgba(255,255,255,0.5);font-family:inherit;font-size:13px;
     cursor:pointer;margin-top:-4px}
 
+  @media (min-width:901px) and (max-height:900px){
+    #game{width:min(520px,56vw,calc((100vh - 80px) * 336 / 550))}
+  }
   @media (max-width:900px){
     #app{flex-direction:column;padding:8px;gap:8px;align-items:center}
-    #game{width:min(100%,calc(60vh * 336 / 530));max-width:100%}
+    #game{width:min(100%,calc(72vh * 336 / 550));max-width:100%}
   }
   @media (max-height:700px){
     #tut-canvas{width:180px;height:180px}
@@ -145,7 +145,6 @@
       <div><span id="score">0</span><span id="combo" aria-live="polite"></span></div>
       <div id="hud-right">
         <span id="best">рекорд: 0</span>
-        <button id="mode-btn" title="Сменить режим и начать заново">4 в ряд</button>
         <button id="leaderboard-btn" title="Таблица рекордов">🏆</button>
         <button id="help-btn" title="Туториал">?</button>
         <button id="settings-btn" title="Настройки" aria-label="Настройки">⚙️</button>
@@ -166,14 +165,22 @@
   </div>
 </div>
 
-<div id="leaderboard" aria-modal="true" role="dialog">
+<div id="leaderboard" aria-modal="true" role="dialog" aria-labelledby="leaderboard-title">
   <div id="leaderboard-card">
-    <h2>🏆 Лучшие результаты</h2>
-    <div id="leaderboard-tabs" role="tablist" aria-label="Режим игры">
-      <button class="leaderboard-tab" data-mode="3" role="tab">3 в ряд</button>
-      <button class="leaderboard-tab" data-mode="4" role="tab">4 в ряд</button>
+    <h2 id="leaderboard-title">🏆 Зал славы</h2>
+    <div class="leaderboard-section-title">Номинация</div>
+    <div id="leaderboard-metrics" class="leaderboard-tabs" role="tablist" aria-label="Номинация">
+      <button class="leaderboard-tab active" data-metric="score" role="tab" aria-selected="true">🏆 Король очков</button>
+      <button class="leaderboard-tab" data-metric="combo" role="tab" aria-selected="false">🔥 Мастер серий</button>
+      <button class="leaderboard-tab" data-metric="level" role="tab" aria-selected="false">⚡ Сила стрелы</button>
     </div>
-    <ol id="leaderboard-list"></ol>
+    <div class="leaderboard-section-title">Период</div>
+    <div id="leaderboard-periods" class="leaderboard-tabs" role="tablist" aria-label="Период">
+      <button class="leaderboard-tab active" data-period="day" role="tab" aria-selected="true">День</button>
+      <button class="leaderboard-tab" data-period="week" role="tab" aria-selected="false">Неделя</button>
+      <button class="leaderboard-tab" data-period="month" role="tab" aria-selected="false">Месяц</button>
+    </div>
+    <ol id="leaderboard-list" aria-live="polite"></ol>
     <button id="leaderboard-close">Закрыть</button>
   </div>
 </div>
@@ -214,7 +221,7 @@ const INTERSTITIAL_EVERY_N_GAMES = 3;
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
-const APP_BUILD_VERSION = '2026-11-22.13';
+const APP_BUILD_VERSION = '2026-11-22.15';
 
 /* ============ TELEGRAM INIT ============ */
 if (window.Telegram && window.Telegram.WebApp) {
@@ -362,20 +369,18 @@ const SHAPES = [
 ];
 
 /* ============ СОСТОЯНИЕ ============ */
-let lineMode = +(localStorage.getItem('arrowsTideLineMode') || 4);
-if (lineMode !== 3 && lineMode !== 4) lineMode = 4;
-
+const lineMode = 3; // Единственный режим: сборка от трёх стрелок.
 let gamesCompleted = +(localStorage.getItem('arrowsTideGamesCompleted') || 0);
 
 let board, pieces, score = 0, best = 0, nextId = 1;
-let leaderboardMode = lineMode;
-
-function bestStorageKey(mode){ return 'arrowsTideBest_' + mode; }
-function readBest(mode){
-  const saved = localStorage.getItem(bestStorageKey(mode));
-  if(saved !== null) return Math.max(0, Number(saved) || 0);
-  // Совместимость со старой версией: старый общий рекорд переносим в режим 4.
-  return mode === 4 ? Math.max(0, Number(localStorage.getItem('arrowsTideBest')) || 0) : 0;
+function readBest(){
+  // Сохраняем лучший личный рекорд из всех прежних версий/режимов.
+  return Math.max(
+    0,
+    Number(localStorage.getItem('arrowsTideBest_3')) || 0,
+    Number(localStorage.getItem('arrowsTideBest_4')) || 0,
+    Number(localStorage.getItem('arrowsTideBest')) || 0
+  );
 }
 let anim = { active: false };
 let drag = null, gameOver = false;
@@ -385,6 +390,14 @@ let rewardedRequestInFlight = false;
 let targeting = null;
 let turnCounter = 0;
 let comboStreak = 0;
+let maxComboThisGame = 0;
+let maxArrowLevelThisGame = 1;
+function trackMaxArrowLevel(){
+  if(!Array.isArray(board)) return;
+  for(const arrow of board){
+    if(arrow) maxArrowLevelThisGame = Math.max(maxArrowLevelThisGame, Number(arrow.level) || 1);
+  }
+}
 function comboMultiplier(streak){
   return streak >= 2 ? 1 + (streak - 1) * 0.10 : 1;
 }
@@ -393,10 +406,6 @@ let targetingFromRescue = false;
 
 /* ============ LOG ============ */
 function logEvent(){ /* debug panel intentionally removed */ }
-
-function updateModeButton(){
-  document.getElementById('mode-btn').textContent = lineMode + ' в ряд';
-}
 
 /* ============ RENDERING UTILS ============ */
 function rrect(g, x, y, w, h, r){
@@ -807,51 +816,63 @@ function endTurn(){
   }
 }
 
-async function leaderboardRequest(action, mode, score = null) {
+let leaderboardMetric = 'score';
+let leaderboardPeriod = 'day';
+let leaderboardRequestId = 0;
+
+async function leaderboardRequest(action, metric = 'score', period = 'day', stats = null) {
   const initData = window.Telegram?.WebApp?.initData;
-  if (!initData) {
-    throw new Error('Открой игру через Telegram — данные авторизации недоступны.');
-  }
+  if (!initData) throw new Error('Открой игру через Telegram — данные авторизации недоступны.');
 
   const response = await fetch(LEADERBOARD_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, mode, score, initData })
+    body: JSON.stringify({
+      action, metric, period,
+      score: stats?.score,
+      maxCombo: stats?.maxCombo,
+      maxArrowLevel: stats?.maxArrowLevel,
+      initData
+    })
   });
 
   let result;
   try { result = await response.json(); }
   catch (_) { throw new Error('Сервер вернул некорректный ответ.'); }
-
   if (!response.ok || !result.success) {
     throw new Error(result.error || `Ошибка таблицы лидеров (${response.status})`);
   }
   return result;
 }
 
-let leaderboardRequestId = 0;
-
 async function renderLeaderboard(){
   const list = document.getElementById('leaderboard-list');
-  const requestedMode = leaderboardMode;
+  const requestedMetric = leaderboardMetric;
+  const requestedPeriod = leaderboardPeriod;
   const requestId = ++leaderboardRequestId;
 
-  document.querySelectorAll('.leaderboard-tab').forEach(btn => {
-    const active = Number(btn.dataset.mode) === requestedMode;
+  document.querySelectorAll('[data-metric]').forEach(btn => {
+    const active = btn.dataset.metric === requestedMetric;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  document.querySelectorAll('[data-period]').forEach(btn => {
+    const active = btn.dataset.period === requestedPeriod;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-selected', active ? 'true' : 'false');
   });
 
   list.innerHTML = '<li>Загрузка результатов...</li>';
   try {
-    const result = await leaderboardRequest('top', requestedMode);
-    if (requestId !== leaderboardRequestId || requestedMode !== leaderboardMode) return;
+    const result = await leaderboardRequest('top', requestedMetric, requestedPeriod);
+    if (requestId !== leaderboardRequestId ||
+        requestedMetric !== leaderboardMetric || requestedPeriod !== leaderboardPeriod) return;
 
     list.innerHTML = '';
     const rows = Array.isArray(result.rows) ? result.rows : [];
     if (!rows.length) {
       const li = document.createElement('li');
-      li.textContent = 'Пока нет результатов в режиме ' + requestedMode + ' в ряд';
+      li.textContent = 'За этот период результатов пока нет. Стань первым!';
       list.appendChild(li);
       return;
     }
@@ -859,9 +880,17 @@ async function renderLeaderboard(){
     rows.forEach((r, i) => {
       const li = document.createElement('li');
       const left = document.createElement('span');
+      const right = document.createElement('strong');
       const playerName = r.display_name || (r.username ? '@' + r.username : 'Игрок');
-      left.textContent = (i + 1) + '. ' + playerName + ' — ' + Number(r.best_score || 0) + ' очков';
+      left.textContent = (i + 1) + '. ' + playerName;
+      const value = Number(r.best_value || 0);
+      right.textContent = requestedMetric === 'score'
+        ? value.toLocaleString('ru-RU') + ' очков'
+        : requestedMetric === 'combo'
+          ? value + ' подряд'
+          : '×' + value;
       li.appendChild(left);
+      li.appendChild(right);
       list.appendChild(li);
     });
   } catch (error) {
@@ -876,23 +905,35 @@ async function renderLeaderboard(){
 
 async function submitLeaderboardScore(){
   try {
-    await leaderboardRequest('submit', lineMode, score);
-    console.info('[Leaderboard] Score submitted:', score, 'mode:', lineMode);
+    trackMaxArrowLevel();
+    await leaderboardRequest('submit', 'score', 'day', {
+      score,
+      maxCombo: maxComboThisGame,
+      maxArrowLevel: maxArrowLevelThisGame
+    });
+    console.info('[Leaderboard] Game statistics submitted:', {
+      score, maxCombo: maxComboThisGame, maxArrowLevel: maxArrowLevelThisGame
+    });
   } catch (error) {
     console.error('[Leaderboard] Submit failed:', error);
   }
 }
 
 function openLeaderboard(){
-  leaderboardMode = lineMode;
   document.getElementById('leaderboard').style.display = 'flex';
   renderLeaderboard();
 }
 function closeLeaderboard(){ document.getElementById('leaderboard').style.display='none'; }
 document.getElementById('leaderboard-btn').onclick = openLeaderboard;
-document.querySelectorAll('.leaderboard-tab').forEach(btn => {
+document.querySelectorAll('[data-metric]').forEach(btn => {
   btn.addEventListener('click', () => {
-    leaderboardMode = Number(btn.dataset.mode) === 3 ? 3 : 4;
+    leaderboardMetric = btn.dataset.metric;
+    renderLeaderboard();
+  });
+});
+document.querySelectorAll('[data-period]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    leaderboardPeriod = btn.dataset.period;
     renderLeaderboard();
   });
 });
@@ -903,15 +944,16 @@ function realGameOver(){
   gameOver = true;
   gamesCompleted++;
   localStorage.setItem('arrowsTideGamesCompleted', gamesCompleted);
+  trackMaxArrowLevel();
   submitLeaderboardScore();
   if(score > best){
     best = score;
-    localStorage.setItem(bestStorageKey(lineMode), best);
-    if(lineMode === 4) localStorage.setItem('arrowsTideBest', best);
+    localStorage.setItem('arrowsTideBest_3', best);
+    localStorage.setItem('arrowsTideBest', best);
   }
   updateHud();
   logEvent('🏁 КОНЕЦ ИГРЫ. Счёт: ' + score + ' (игр сыграно: ' + gamesCompleted + ')', 'log-gameover');
-  document.getElementById('finalScore').textContent = 'Счёт: ' + score + ' · режим ' + lineMode + ' в ряд';
+  document.getElementById('finalScore').textContent = 'Счёт: ' + score;
   document.getElementById('over').style.display = 'flex';
 }
 
@@ -1016,9 +1058,11 @@ function handleDone(a){
     // до окончательного расчёта движения и столкновений.
     const tideResult = computeTideWithLinePriority();
     board = tideResult.nb;
+    trackMaxArrowLevel();
     const li = findLines(board, lineMode);
     if(li.cells.size){
       comboStreak++;
+      maxComboThisGame = Math.max(maxComboThisGame, comboStreak);
       const streakMultiplier = comboMultiplier(comboStreak);
       let total = 0;
       for(const ln of li.lines){
@@ -1434,7 +1478,7 @@ const TUT_SLIDES = [
     get title(){ return '💥 Линия из ' + lineMode; },
     get text(){
       const total = lineMode * 12;
-      return lineMode + ' стрелки одного цвета в ряд или столбец лопаются — направление стрелок не имеет значения. Уровень стрелок даёт дополнительные очки. В обоих режимах поле 6×6.';
+      return lineMode + ' стрелки одного цвета в ряд или столбец лопаются — направление стрелок не имеет значения. Уровень стрелок даёт дополнительные очки. Игровое поле всегда 6×6.';
     },
     draw(g, t){
       const c = t % 3;
@@ -1601,12 +1645,6 @@ document.addEventListener('keydown', e=>{
   else if(e.key === 'Escape') closeTutorial();
 });
 
-document.getElementById('mode-btn').onclick = () => {
-  lineMode = lineMode === 3 ? 4 : 3;
-  localStorage.setItem('arrowsTideLineMode', lineMode);
-  init(); // переключение 3↔4 всегда запускает новую партию с чистого поля
-};
-
 /* ============ АВТОТЕСТЫ ЛОГИКИ ============ */
 function runLogicTests(){
   const original = board;
@@ -1734,7 +1772,7 @@ function runLogicTests(){
     board=empty(); for(let x=0;x<4;x++) board[idx(x,4)]={id:x+1,color:2,level:x+1,dir:x%4};
     const l=findLines(board,4); return l.lines.length===1 && l.cells.size===4;
   });
-  test('оба режима используют поле 6×6', () => {
+  test('игровое поле использует размер 6×6', () => {
     return N===6 && board.length===36;
   });
   test('в начале партии по три каждого из трёх пауэрапoв', () => {
@@ -1794,6 +1832,8 @@ function init(){
   pieces = [newPiece(), newPiece(), newPiece()];
   score = 0; nextId = 1; gameOver = false; drag = null;
   comboStreak = 0;
+  maxComboThisGame = 0;
+  maxArrowLevelThisGame = 1;
   anim = {active:false};
   powerups = { bomb: 3, firework: 3, eraser: 3 };
   rewardedThisGame = 0;
@@ -1801,8 +1841,6 @@ function init(){
   targeting = null; turnCounter = 0;
   rescueActive = false; targetingFromRescue = false;
   best = readBest(lineMode);
-  leaderboardMode = lineMode;
-  updateModeButton();
   updateHud();
   document.getElementById('over').style.display = 'none';
   document.getElementById('rescue').style.display = 'none';
