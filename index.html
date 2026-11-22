@@ -214,7 +214,7 @@ const INTERSTITIAL_EVERY_N_GAMES = 3;
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
-const APP_BUILD_VERSION = '2026-11-22.8';
+const APP_BUILD_VERSION = '2026-11-22.13';
 
 /* ============ TELEGRAM INIT ============ */
 if (window.Telegram && window.Telegram.WebApp) {
@@ -334,16 +334,16 @@ let H = W + TRAY + PU_ROW;
 const COLORS = [[79,195,247],[255,138,101],[174,213,129],[186,104,200]];
 const COLOR_NAMES = ['голубой','оранжевый','зелёный','фиолетовый'];
 const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
-const PU_KEYS = ['bomb','rotate180','rotateCW','rotateCCW','move'];
-const PU_ICONS = ['💣','↕️','↻','↺','✥'];
-const PU_LABELS = ['Бомба','180°','Вправо','Влево','Перенос'];
+const PU_KEYS = ['bomb','firework','eraser'];
+const PU_ICONS = ['💣','🎆','🎨'];
+const PU_LABELS = ['Бомба','Фейерверк','Удалить цвет'];
 
 const cvs = document.getElementById('c');
 const ctx = cvs.getContext('2d');
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 function resizeGameCanvas(){
-  N = lineMode === 4 ? 8 : 6;
-  CELL = N === 8 ? 48 : 56;
+  N = 6;
+  CELL = 56;
   W = N * CELL; H = W + TRAY + PU_ROW;
   cvs.width = W * DPR; cvs.height = H * DPR;
   cvs.style.aspectRatio = W + '/' + H;
@@ -379,10 +379,10 @@ function readBest(mode){
 }
 let anim = { active: false };
 let drag = null, gameOver = false;
-let powerups = { bomb: 3, rotate180: 3, rotateCW: 3, rotateCCW: 3, move: 3 };
+let powerups = { bomb: 3, firework: 3, eraser: 3 };
 let rewardedThisGame = 0;
 let rewardedRequestInFlight = false;
-let targeting = null, moveSource = null;
+let targeting = null;
 let turnCounter = 0;
 let comboStreak = 0;
 function comboMultiplier(streak){
@@ -475,7 +475,8 @@ function newPiece(){
 }
 
 /* ============ TIDE (с разворотом встречных) ============ */
-function computeTide(){
+function computeTide(protectedMergeIds = null, disableMerges = false){
+  const mergeProtected = id => disableMerges || !!(protectedMergeIds && protectedMergeIds.has(id));
   const posOf = {};
   for(let i=0;i<N*N;i++) if(board[i]) posOf[board[i].id] = {x:i%N, y:(i/N)|0};
   const ids = Object.keys(posOf).map(Number);
@@ -518,13 +519,14 @@ function computeTide(){
     const ttx = tp.x + td[0], tty = tp.y + td[1];
     if(ttx === p.x && tty === p.y){
       checkedFacing.add(id); checkedFacing.add(t.id);
-      if(a.color === t.color){
+      if(a.color === t.color && !mergeProtected(id) && !mergeProtected(t.id)){
         const survivor = (a.level > t.level || (a.level === t.level && id < t.id)) ? id : t.id;
         const loser = survivor === id ? t.id : id;
         state[survivor] = 'stay';
         state[loser] = 'move';
         mergeInto.set(loser, survivor);
       } else {
+        // Линия имеет приоритет: участники потенциальной линии не сливаются.
         facing.add(id); facing.add(t.id);
       }
     }
@@ -546,7 +548,7 @@ function computeTide(){
     // от уровня; смешанные цвета разрешают конфликт обычным приоритетом.
     const firstPos = posOf[group[0]];
     const firstArrow = board[idx(firstPos.x, firstPos.y)];
-    const canMerge = group.length >= 2 && group.every(id => {
+    const canMerge = !disableMerges && !group.some(mergeProtected) && group.length >= 2 && group.every(id => {
       const p = posOf[id];
       return board[idx(p.x, p.y)].color === firstArrow.color;
     });
@@ -590,6 +592,7 @@ function computeTide(){
     if(!inB(tx, ty)) continue;
     const target = board[idx(tx, ty)];
     if(!target || target.color !== a.color || state[target.id] !== 'stay') continue;
+    if(mergeProtected(id) || mergeProtected(target.id)) continue;
     // Движущаяся стрелка становится участником слияния в клетке цели.
     state[id] = 'move';
     mergeInto.set(id, target.id);
@@ -662,11 +665,24 @@ function computeTide(){
     const isFacing = facing.has(id);
     if(wallInFront || isFacing){
       const nd = (a.dir+2)%4;
-      nb[idx(p.x,p.y)] = {...a, dir:nd};
-      anims.push({from:p, to:p, color:a.color, level:a.level, dir:nd});
-      if(wallInFront){
+      const cell = idx(p.x,p.y);
+      const current = nb[cell];
+      // Не затираем результат слияния, который уже записан в клетку.
+      // Если выжившая стрелка — сама отскакивающая, сохраняем её новый уровень
+      // и применяем разворот. Если выжила входящая стрелка, оставляем её целиком.
+      let didBounce = false;
+      if(!current || current.id === id){
+        const keptLevel = current && current.id === id
+          ? Math.max(a.level, current.level)
+          : a.level;
+        nb[cell] = {...a, level:keptLevel, dir:nd};
+        anims.push({from:p, to:p, color:a.color, level:keptLevel, dir:nd});
+        didBounce = true;
+      }
+      // Если стрелка уже поглощена слиянием, не показываем ложный отскок.
+      if(didBounce && wallInFront){
         events.push({cls:'log-bounce', text:'↩️ Отскок от стены: ' + COLOR_NAMES[a.color] + ' ' + posStr(p)});
-      } else {
+      } else if(didBounce){
         events.push({cls:'log-reverse', text:'🔄 Разворот (встречная): ' + COLOR_NAMES[a.color] + ' ' + posStr(p)});
       }
     } else if(!nb[idx(p.x,p.y)]){
@@ -686,7 +702,7 @@ function findLines(b, threshold){
   for(let y=0;y<N;y++){
     let start = 0;
     for(let x=1;x<=N;x++){
-      const same = x<N && b[idx(x,y)] && b[idx(x-1,y)] && b[idx(x,y)].color===b[idx(x-1,y)].color && b[idx(x,y)].dir===b[idx(x-1,y)].dir;
+      const same = x<N && b[idx(x,y)] && b[idx(x-1,y)] && b[idx(x,y)].color===b[idx(x-1,y)].color;
       if(!same){
         if(x-start>=threshold){
           const cells=[];
@@ -700,7 +716,7 @@ function findLines(b, threshold){
   for(let x=0;x<N;x++){
     let start = 0;
     for(let y=1;y<=N;y++){
-      const same = y<N && b[idx(x,y)] && b[idx(x,y-1)] && b[idx(x,y)].color===b[idx(x,y-1)].color && b[idx(x,y)].dir===b[idx(x,y-1)].dir;
+      const same = y<N && b[idx(x,y)] && b[idx(x,y-1)] && b[idx(x,y)].color===b[idx(x,y-1)].color;
       if(!same){
         if(y-start>=threshold){
           const cells=[];
@@ -712,6 +728,20 @@ function findLines(b, threshold){
     }
   }
   return {cells: cellsSet, lines};
+}
+
+// Сначала моделируем прилив без слияний. Стрелки, которые в этом
+// варианте образуют линию, защищаем от слияния в основном расчёте.
+function computeTideWithLinePriority(){
+  const preview = computeTide(null, true);
+  const previewLines = findLines(preview.nb, lineMode);
+  if(!previewLines.cells.size) return computeTide();
+  const protectedIds = new Set();
+  for(const cell of previewLines.cells){
+    const arrow = preview.nb[cell];
+    if(arrow) protectedIds.add(arrow.id);
+  }
+  return computeTide(protectedIds, false);
 }
 
 function scoreLine(cells, threshold, b){
@@ -926,8 +956,12 @@ function hideRescue(){ document.getElementById('rescue').style.display = 'none';
 function pickRescue(key){
   hideRescue();
   rescueActive = false;
-  targeting = key; moveSource = null; targetingFromRescue = true;
-  logEvent('🎯 Спасение: ' + PU_ICONS[PU_KEYS.indexOf(key)] + ' — выбери стрелку на поле', 'log-powerup');
+  if(key === 'firework'){
+    targeting = null; targetingFromRescue = false; applyFirework();
+  } else {
+    targeting = key; targetingFromRescue = true;
+    logEvent('🎯 Спасение: ' + PU_ICONS[PU_KEYS.indexOf(key)] + (key === 'bomb' ? ' — выбери центр взрыва' : ' — выбери стрелку нужного цвета'), 'log-powerup');
+  }
 }
 
 document.getElementById('rescueGiveUp').onclick = () => {
@@ -978,7 +1012,10 @@ document.getElementById('restart').onclick = () => {
 /* ============ TIDE DONE ============ */
 function handleDone(a){
   if(a.kind==='tide'){
-    board = a.nb;
+    // Лопанье линий приоритетнее слияния: защищаем участников линии
+    // до окончательного расчёта движения и столкновений.
+    const tideResult = computeTideWithLinePriority();
+    board = tideResult.nb;
     const li = findLines(board, lineMode);
     if(li.cells.size){
       comboStreak++;
@@ -1042,10 +1079,16 @@ function handlePowerupTap(i){
     requestPowerupViaAd(key, () => logEvent('✅ Получен ' + PU_ICONS[i] + ' — используй его', 'log-ad'));
     return;
   }
-  if(targeting === key){ targeting=null; moveSource=null; return; }
-  targeting = key; moveSource = null;
+  if(key === 'firework'){
+    targeting = null; targetingFromRescue = false; applyFirework(); return;
+  }
+  if(targeting === key){
+    targeting = null; targetingFromRescue = false;
+    return;
+  }
+  targeting = key;
   targetingFromRescue = false;
-  const hint = key==='bomb' ? 'Выбери центр взрыва' : key==='move' ? 'Выбери стрелку, затем пустую клетку' : 'Выбери стрелку на поле';
+  const hint = key === 'bomb' ? 'Выбери центр взрыва' : 'Выбери стрелку нужного цвета';
   logEvent('🎯 ' + PU_ICONS[i] + ' ' + hint, 'log-powerup');
 }
 
@@ -1059,56 +1102,62 @@ function applyBomb(cx,cy){
       board[idx(x,y)] = null;
     }
   }
-  if(pops.length === 0){
-    // Пустая клетка не расходует бомбу и не отменяет выбор цели.
-    if(targetingFromRescue) rescueActive = false;
-    return;
-  }
+  if(pops.length === 0) return;
   targetingFromRescue = false;
-  targeting = null; moveSource=null; powerups.bomb--;
+  targeting = null; powerups.bomb--;
   addScore(pops.length * 8);
   haptic('heavy');
   logEvent('💣 Уничтожено ' + pops.length, 'log-pop');
   anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
 }
 
-function applyArrowTransform(cx,cy,key){
-  const i=idx(cx,cy), a=board[i];
-  if(!a) return false;
-  if(key==='rotate180') a.dir=(a.dir+2)%4;
-  else if(key==='rotateCW') a.dir=(a.dir+1)%4;
-  else if(key==='rotateCCW') a.dir=(a.dir+3)%4;
-  else return false;
-  powerups[key]--; targeting=null; targetingFromRescue=false;
-  haptic('medium');
-  logEvent('🔄 Стрелка повёрнута: ' + PU_LABELS[PU_KEYS.indexOf(key)], 'log-powerup');
+function applyEraser(cx,cy){
+  const target = board[idx(cx,cy)];
+  if(!target) return false;
+  const color = target.color;
+  const pops = [];
+  for(let i=0;i<N*N;i++){
+    const a = board[i];
+    if(a && a.color === color){
+      pops.push({x:i%N, y:(i/N)|0, color:a.color, level:a.level, dir:a.dir});
+      board[i] = null;
+    }
+  }
+  targetingFromRescue = false; targeting = null; powerups.eraser--;
+  addScore(pops.length * 8);
+  haptic('heavy');
+  logEvent('🎨 Удалено ' + pops.length + ' стрелок цвета «' + COLOR_NAMES[color] + '»', 'log-pop');
+  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
   return true;
 }
 
-function applyMove(cx,cy){
-  if(!moveSource){
-    const a=board[idx(cx,cy)];
-    if(!a) return;
-    moveSource={x:cx,y:cy};
-    logEvent('📍 Теперь выбери пустую клетку для переноса', 'log-powerup');
-    return;
+function applyFirework(){
+  if(powerups.firework <= 0) return false;
+  const occupied = [];
+  for(let i=0;i<N*N;i++) if(board[i]) occupied.push(i);
+  if(occupied.length === 0) return false;
+  const count = Math.min(9, occupied.length);
+  const pops = [];
+  for(let k=0;k<count;k++){
+    const pick = (Math.random()*occupied.length)|0;
+    const i = occupied.splice(pick,1)[0];
+    const a = board[i];
+    pops.push({x:i%N, y:(i/N)|0, color:a.color, level:a.level, dir:a.dir});
+    board[i] = null;
   }
-  if(cx===moveSource.x && cy===moveSource.y){ moveSource=null; return; }
-  const dest=idx(cx,cy);
-  if(board[dest]) return;
-  const src=idx(moveSource.x,moveSource.y);
-  board[dest]=board[src]; board[src]=null;
-  powerups.move--; targeting=null; moveSource=null; targetingFromRescue=false;
-  haptic('medium');
-  logEvent('✥ Стрелка перемещена в выбранную клетку', 'log-powerup');
+  targetingFromRescue = false; targeting = null; powerups.firework--;
+  addScore(pops.length * 8);
+  haptic('heavy');
+  logEvent('🎆 Уничтожено ' + pops.length + ' случайных стрелок', 'log-pop');
+  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+  return true;
 }
 
 function handleTargetTap(x,y){
   const cx = Math.floor(x/CELL), cy = Math.floor(y/CELL);
   if(!inB(cx,cy)) return;
   if(targeting === 'bomb') applyBomb(cx,cy);
-  else if(targeting === 'move') applyMove(cx,cy);
-  else if(['rotate180','rotateCW','rotateCCW'].includes(targeting)) applyArrowTransform(cx,cy,targeting);
+  else if(targeting === 'eraser') applyEraser(cx,cy);
   if(targetingFromRescue && !targeting){ hideRescue(); rescueActive=false; }
 }
 
@@ -1215,7 +1264,7 @@ function draw(){
   }
   drawPowerups();
   if(targeting){
-    const text = targeting === 'bomb' ? '💣 Выбери центр взрыва' : targeting === 'move' ? (moveSource ? '✥ Выбери пустую клетку' : '✥ Выбери стрелку') : '🔄 Выбери стрелку';
+    const text = targeting === 'bomb' ? '💣 Выбери центр взрыва' : targeting === 'eraser' ? '🎨 Выбери стрелку нужного цвета' : '';
     ctx.font='bold 13px system-ui'; const tw = ctx.measureText(text).width + 24;
     rrect(ctx, W/2-tw/2, 6, tw, 26, 13);
     ctx.fillStyle='rgba(79,195,247,0.9)'; ctx.fill();
@@ -1385,7 +1434,7 @@ const TUT_SLIDES = [
     get title(){ return '💥 Линия из ' + lineMode; },
     get text(){
       const total = lineMode * 12;
-      return lineMode + ' стрелки одного цвета и направления в ряд или столбец лопаются. Уровень стрелок даёт дополнительные очки. В режиме 3 в ряд поле 6×6, в режиме 4 в ряд — 8×8.';
+      return lineMode + ' стрелки одного цвета в ряд или столбец лопаются — направление стрелок не имеет значения. Уровень стрелок даёт дополнительные очки. В обоих режимах поле 6×6.';
     },
     draw(g, t){
       const c = t % 3;
@@ -1427,12 +1476,12 @@ const TUT_SLIDES = [
       }
     }
   },
-  { title: '🎁 Пауэрапы', text: 'В начале каждой новой игры доступно по 3 использования каждой способности: 💣 взрыв клеток в области 3×3; ↕️ разворот стрелки на 180°; ↻ поворот вправо на 90°; ↺ поворот влево на 90°; ✥ перенос стрелки в выбранную пустую клетку. Когда запас закончится, можно получить дополнительное использование за рекламу.', draw(g,t){
+  { title: '🎁 Пауэрапы', text: 'В начале каждой новой игры есть по 3 использования: 💣 бомба уничтожает стрелки в области 3×3; 🎆 фейерверк случайно удаляет до 9 стрелок; 🎨 удаление цвета убирает с поля все стрелки выбранного цвета. Когда запас закончится, можно получить дополнительное использование за рекламу.', draw(g,t){
     const pulse = 0.5 + 0.5 * Math.sin(t * 2);
-    const icons = ['💣', '↕️', '↻', '↺', '✥'];
-    const clr = ['#ff9800', '#4fc3f7', '#81c784', '#ba68c8', '#ffd54f'];
-    for(let i=0;i<5;i++){
-      const x = TUT_W * (i + 0.5) / 5;
+    const icons = ['💣', '🎆', '🎨'];
+    const clr = ['#ff9800', '#e879f9', '#4fc3f7'];
+    for(let i=0;i<3;i++){
+      const x = TUT_W * (i + 0.5) / 3;
       g.beginPath(); g.arc(x, TUT_H/2, 18, 0, Math.PI*2);
       g.fillStyle = 'rgba(255,255,255,' + (0.08 + 0.12*pulse) + ')'; g.fill();
       g.strokeStyle = clr[i]; g.lineWidth = 2; g.stroke();
@@ -1458,7 +1507,7 @@ const TUT_SLIDES = [
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('🚨 Ходов нет!', TUT_W/2, TUT_H/2 - 25);
     g.font = '24px system-ui'; g.fillStyle = '#fff';
-    g.fillText('💣 ↕️ ↻ ↺ ✥', TUT_W/2, TUT_H/2 + 10);
+    g.fillText('💣 🎆 🎨', TUT_W/2, TUT_H/2 + 10);
     g.font = '11px system-ui'; g.fillStyle = 'rgba(255,255,255,0.7)';
     g.fillText('📺 Получить за рекламу', TUT_W/2, TUT_H/2 + 40);
   }}
@@ -1631,9 +1680,65 @@ function runLogicTests(){
     board=empty(); board[idx(0,0)]={id:1,color:0,level:1,dir:0};
     return computeTide().nb[idx(0,0)].dir===2;
   });
-  test('линия определяется по цвету', () => {
-    board=empty(); for(let x=0;x<4;x++) board[idx(x,4)]={id:x+1,color:2,level:x+1,dir:1};
+  test('слияние у стены сохраняет повышенный уровень выжившей стрелки', () => {
+    board=empty();
+    board[idx(0,0)]={id:1,color:0,level:4,dir:0}; // у верхней стены, уровень 4
+    board[idx(0,1)]={id:2,color:0,level:2,dir:0}; // упирается в неё
+    const r=computeTide(), survivor=r.nb[idx(0,0)];
+    return survivor?.level===5 && survivor?.id===1 && survivor?.dir===2 &&
+      r.nb.filter(Boolean).length===1;
+  });
+  test('слияние у стены не затирает входящую стрелку с более высоким уровнем', () => {
+    board=empty();
+    board[idx(0,0)]={id:1,color:0,level:2,dir:0};
+    board[idx(0,1)]={id:2,color:0,level:5,dir:0};
+    const r=computeTide(), survivor=r.nb[idx(0,0)];
+    return survivor?.level===6 && survivor?.id===2 && survivor?.dir===0 &&
+      r.nb.filter(Boolean).length===1;
+  });
+  test('слияние с неподвижной стрелкой сохраняется при финальной обработке хода', () => {
+    board=empty();
+    board[idx(1,1)]={id:1,color:1,level:2,dir:0}; // упирается в неподвижную
+    board[idx(1,0)]={id:2,color:1,level:4,dir:0}; // стоит у стены
+    const r=computeTide();
+    return r.nb[idx(1,0)]?.level===5 && r.nb.filter(Boolean).length===1;
+  });
+  test('встречные стрелки одного цвета сливаются без потери уровня', () => {
+    board=empty();
+    board[idx(1,1)]={id:1,color:0,level:1,dir:1};
+    board[idx(2,1)]={id:2,color:0,level:3,dir:3};
+    const r=computeTide();
+    const survivor=r.nb.filter(Boolean);
+    return survivor.length===1 && survivor[0].level===4 && survivor[0].id===2;
+  });
+  test('линия имеет приоритет над слиянием при отскоке у стены', () => {
+    board=empty();
+    board[idx(0,0)]={id:1,color:2,level:2,dir:1}; // движется вправо в занятую клетку
+    board[idx(1,0)]={id:2,color:2,level:3,dir:0}; // упирается в верхнюю стену
+    board[idx(2,0)]={id:3,color:2,level:1,dir:0};
+    board[idx(3,0)]={id:4,color:2,level:1,dir:0};
+    const r=computeTideWithLinePriority();
+    const line=findLines(r.nb,4);
+    return line.cells.size===4 && r.nb.filter(Boolean).length===4 &&
+      !r.events.some(e=>e.cls==='log-merge');
+  });
+  test('если линии нет, одинаковые стрелки по-прежнему сливаются', () => {
+    board=empty();
+    board[idx(1,1)]={id:1,color:1,level:2,dir:1};
+    board[idx(2,1)]={id:2,color:1,level:3,dir:3};
+    const r=computeTideWithLinePriority();
+    return r.nb.filter(Boolean).length===1 && r.nb.filter(Boolean)[0].level===4 &&
+      r.events.some(e=>e.cls==='log-merge');
+  });
+  test('линия определяется по цвету без требования общего направления', () => {
+    board=empty(); for(let x=0;x<4;x++) board[idx(x,4)]={id:x+1,color:2,level:x+1,dir:x%4};
     const l=findLines(board,4); return l.lines.length===1 && l.cells.size===4;
+  });
+  test('оба режима используют поле 6×6', () => {
+    return N===6 && board.length===36;
+  });
+  test('в начале партии по три каждого из трёх пауэрапoв', () => {
+    return PU_KEYS.length===3 && powerups.bomb===3 && powerups.firework===3 && powerups.eraser===3;
   });
   test('бонус серии: 0%, 10%, 20%, 30%', () => {
     return comboMultiplier(1)===1 && comboMultiplier(2)===1.1 &&
@@ -1690,7 +1795,7 @@ function init(){
   score = 0; nextId = 1; gameOver = false; drag = null;
   comboStreak = 0;
   anim = {active:false};
-  powerups = { bomb: 3, rotate180: 3, rotateCW: 3, rotateCCW: 3, move: 3 };
+  powerups = { bomb: 3, firework: 3, eraser: 3 };
   rewardedThisGame = 0;
   rewardedRequestInFlight = false;
   targeting = null; turnCounter = 0;
