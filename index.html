@@ -211,7 +211,7 @@ const INTERSTITIAL_EVERY_N_GAMES = 3;
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
-const APP_BUILD_VERSION = '2026-11-22.3';
+const APP_BUILD_VERSION = '2026-11-22.5';
 
 /* ============ TELEGRAM INIT ============ */
 if (window.Telegram && window.Telegram.WebApp) {
@@ -231,15 +231,26 @@ let soundEnabled = readSetting(SETTINGS_KEYS.sound, true);
 let vibrationEnabled = readSetting(SETTINGS_KEYS.vibration, true);
 
 function haptic(type){
-  if(!vibrationEnabled) return;
+  if(!vibrationEnabled) return false;
   type = type || 'light';
-  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-    try { window.Telegram.WebApp.HapticFeedback.impactOccurred(type); } catch(e){}
+  let telegramSent = false;
+  const webApp = window.Telegram && window.Telegram.WebApp;
+  const feedback = webApp && webApp.HapticFeedback;
+
+  // В Telegram используем нативную тактильную отдачу.
+  if(feedback && typeof feedback.impactOccurred === 'function'){
+    try { feedback.impactOccurred(type); telegramSent = true; } catch(e) { /* fallback ниже */ }
   }
-  // Telegram haptics предпочтительнее; navigator.vibrate — запасной вариант вне Telegram.
-  if (!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) && 'vibrate' in navigator) {
-    try { navigator.vibrate(type === 'heavy' ? [35,18,55] : type === 'medium' ? 28 : 12); } catch(e){}
+
+  // Запасной путь для WebView/браузеров, где доступен Vibration API.
+  // Не вызываем его повторно, если нативный Telegram haptic уже отправлен.
+  if(!telegramSent && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'){
+    try {
+      const pattern = type === 'heavy' ? [45,25,65] : type === 'medium' ? [30,18,30] : type === 'rigid' ? [18,12,18] : 14;
+      navigator.vibrate(pattern);
+    } catch(e){}
   }
+  return telegramSent;
 }
 
 let popAudio = null;
@@ -422,16 +433,30 @@ function drawPiece(p,cx,cy,size){
   const bx = (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
   const by = (Math.min.apply(null,ys)+Math.max.apply(null,ys))/2;
   for(const c of p.cells){
-    drawArrow(cx+(c.x-bx)*size, cy+(c.y-by)*size, size, COLORS[p.color], p.dir, 1);
+    drawArrow(cx+(c.x-bx)*size, cy+(c.y-by)*size, size, COLORS[p.color], c.dir ?? p.dir, 1);
   }
 }
 
 function newPiece(){
   const s = SHAPES[(Math.random()*SHAPES.length)|0];
+  const cells = s.map(c=>({x:c[0],y:c[1]}));
+  const straightTriomino = cells.length === 3 &&
+    (cells.every(c=>c.y === cells[0].y) || cells.every(c=>c.x === cells[0].x));
+  const pieceDir = (Math.random()*4)|0;
+
+  // В прямой фигуре из трёх блоков направления не повторяются:
+  // это исключает автоматическое исчезновение всей фигуры при первом же приливе.
+  if(straightTriomino){
+    const dirs = [0,1,2,3];
+    for(let i=dirs.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [dirs[i],dirs[j]]=[dirs[j],dirs[i]]; }
+    dirs.length = 3;
+    cells.forEach((c,i)=>c.dir=dirs[i]);
+  }
+
   return {
-    cells: s.map(c=>({x:c[0],y:c[1]})),
+    cells,
     color: (Math.random()*COLORS.length)|0,
-    dir: (Math.random()*4)|0,
+    dir: pieceDir,
     used: false
   };
 }
@@ -602,7 +627,7 @@ function findLines(b, threshold){
   for(let y=0;y<N;y++){
     let start = 0;
     for(let x=1;x<=N;x++){
-      const same = x<N && b[idx(x,y)] && b[idx(x-1,y)] && b[idx(x,y)].color===b[idx(x-1,y)].color;
+      const same = x<N && b[idx(x,y)] && b[idx(x-1,y)] && b[idx(x,y)].color===b[idx(x-1,y)].color && b[idx(x,y)].dir===b[idx(x-1,y)].dir;
       if(!same){
         if(x-start>=threshold){
           const cells=[];
@@ -616,7 +641,7 @@ function findLines(b, threshold){
   for(let x=0;x<N;x++){
     let start = 0;
     for(let y=1;y<=N;y++){
-      const same = y<N && b[idx(x,y)] && b[idx(x,y-1)] && b[idx(x,y)].color===b[idx(x,y-1)].color;
+      const same = y<N && b[idx(x,y)] && b[idx(x,y-1)] && b[idx(x,y)].color===b[idx(x,y-1)].color && b[idx(x,y)].dir===b[idx(x,y-1)].dir;
       if(!same){
         if(y-start>=threshold){
           const cells=[];
@@ -660,7 +685,7 @@ function placePiece(i,gx,gy){
   const p = pieces[i];
   turnCounter++;
   logEvent('━━━ Ход ' + turnCounter + ': ' + COLOR_NAMES[p.color] + ' в ' + posStr({x:gx,y:gy}) + ' ━━━', 'log-system');
-  for(const c of p.cells) board[idx(gx+c.x, gy+c.y)] = {id:nextId++, color:p.color, level:1, dir:p.dir};
+  for(const c of p.cells) board[idx(gx+c.x, gy+c.y)] = {id:nextId++, color:p.color, level:1, dir:c.dir ?? p.dir};
   p.used = true;
   haptic('light');
   logEvent('📍 Установлено: ' + p.cells.map(c=>posStr({x:gx+c.x,y:gy+c.y})).join(', '), 'log-placement');
@@ -1305,7 +1330,7 @@ const TUT_SLIDES = [
     get title(){ return '💥 Линия из ' + lineMode; },
     get text(){
       const total = lineMode * 12;
-      return lineMode + ' одинаковых по цвету стрелок в ряд лопаются. Базовые очки за клетку + бонус за длину линии и уровень стрелки.';
+      return lineMode + ' одинаковых по цвету и направлению стрелок в ряд лопаются. Базовые очки за клетку + бонус за длину линии и уровень стрелки.';
     },
     draw(g, t){
       const c = t % 3;
@@ -1452,7 +1477,17 @@ soundToggle.addEventListener('change', () => {
 vibrationToggle.addEventListener('change', () => {
   vibrationEnabled = vibrationToggle.checked;
   localStorage.setItem(SETTINGS_KEYS.vibration, vibrationEnabled ? '1' : '0');
-  if(vibrationEnabled) haptic('light');
+  if(vibrationEnabled){
+    // Тестовый короткий импульс сразу после включения пользователем.
+    const webApp = window.Telegram && window.Telegram.WebApp;
+    if(webApp && webApp.HapticFeedback && typeof webApp.HapticFeedback.notificationOccurred === 'function'){
+      try { webApp.HapticFeedback.notificationOccurred('success'); } catch(e){ haptic('light'); }
+    } else {
+      haptic('light');
+    }
+  } else if(typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'){
+    try { navigator.vibrate(0); } catch(e){}
+  }
 });
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && settingsEl.style.display === 'flex') closeSettings(); });
 document.addEventListener('keydown', e=>{
