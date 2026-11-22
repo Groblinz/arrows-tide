@@ -64,31 +64,24 @@
     font-weight:600;background:rgba(255,100,100,0.25);color:#ffb0b0;
     cursor:pointer;font-family:inherit;margin-top:8px}
 
-  #debug{flex:1 1 320px;min-width:280px;max-width:460px;height:100%;
-    display:flex;flex-direction:column;background:#060a16;
-    border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden}
-  #debug-header{display:flex;align-items:center;justify-content:space-between;
-    padding:10px 12px;background:rgba(255,255,255,0.03);
-    border-bottom:1px solid rgba(255,255,255,0.08);font-size:13px;
-    font-weight:600;flex-shrink:0}
-  #debug-clear{background:rgba(255,255,255,0.08);border:0;color:#e8eefc;
-    padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;
-    font-family:inherit}
-  #debug-body{flex:1 1 auto;overflow-y:auto;padding:8px 12px;
-    font-family:'SF Mono',Menlo,Consolas,monospace;font-size:11.5px;
-    line-height:1.5;color:#c8d3e8}
-  .log-line{padding:1px 0;word-wrap:break-word}
-  .log-system{color:#6e7a95;font-style:italic;border-top:1px solid rgba(255,255,255,.06);margin-top:4px;padding-top:4px}
-  .log-placement{color:#81c784;font-weight:600}
-  .log-merge{color:#ffd54f;font-weight:600}
-  .log-bounce{color:#fff176}
-  .log-reverse{color:#81d4fa;font-weight:600}
-  .log-pop{color:#ff9800;font-weight:700}
-  .log-bonus{color:#e040fb;font-weight:700}
-  .log-powerup{color:#ce93d8;font-weight:600}
-  .log-ad{color:#ffd54f;font-weight:600}
-  .log-rescue{color:#ff5252;font-weight:700}
-  .log-gameover{color:#f44336;font-weight:700}
+  #leaderboard-btn{background:rgba(255,255,255,.1);border:0;color:#e8eefc;
+    padding:6px 10px;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  #leaderboard{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    padding:16px;background:rgba(4,6,14,.88);backdrop-filter:blur(8px);z-index:110}
+  #leaderboard-card{width:min(420px,100%);max-height:85vh;overflow:auto;background:#16213e;
+    border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  #leaderboard-card h2{margin:0 0 14px;font-size:22px}
+  #leaderboard-tabs{display:flex;gap:8px;margin:0 0 12px}
+  .leaderboard-tab{flex:1;padding:9px 10px;border:1px solid rgba(79,195,247,.25);
+    border-radius:10px;background:rgba(255,255,255,.05);color:#e8eefc;
+    font:600 13px system-ui;cursor:pointer}
+  .leaderboard-tab.active{background:rgba(79,195,247,.2);border-color:#4fc3f7;color:#4fc3f7}
+  #leaderboard-list{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+  #leaderboard-list li{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;
+    background:rgba(255,255,255,.06);border-radius:10px;font-variant-numeric:tabular-nums}
+  #leaderboard-list small{opacity:.55}
+  #leaderboard-close{margin-top:14px;width:100%;padding:11px;border:0;border-radius:11px;
+    background:linear-gradient(180deg,#4fc3f7,#2196f3);color:#04101f;font:700 14px inherit}
 
   #tutorial{position:fixed;inset:0;background:rgba(4,6,14,0.9);display:none;
     align-items:center;justify-content:center;z-index:100;padding:16px;
@@ -119,7 +112,6 @@
   @media (max-width:900px){
     #app{flex-direction:column;padding:8px;gap:8px;align-items:center}
     #game{width:min(100%,calc(60vh * 336 / 530));max-width:100%}
-    #debug{width:100%;max-width:460px;flex:1 1 auto;min-height:100px}
   }
   @media (max-height:700px){
     #tut-canvas{width:180px;height:180px}
@@ -134,7 +126,8 @@
       <div id="score">0</div>
       <div id="hud-right">
         <span id="best">рекорд: 0</span>
-        <button id="mode-btn" title="Порог линии">4 в ряд</button>
+        <button id="mode-btn" title="Сменить режим и начать заново">4 в ряд</button>
+        <button id="leaderboard-btn" title="Таблица рекордов">🏆</button>
         <button id="help-btn" title="Туториал">?</button>
       </div>
     </div>
@@ -151,12 +144,17 @@
       <button id="restart">Ещё раз</button>
     </div>
   </div>
-  <div id="debug">
-    <div id="debug-header">
-      <span>🐛 Debug Log</span>
-      <button id="debug-clear">Очистить</button>
+</div>
+
+<div id="leaderboard" aria-modal="true" role="dialog">
+  <div id="leaderboard-card">
+    <h2>🏆 Лучшие результаты</h2>
+    <div id="leaderboard-tabs" role="tablist" aria-label="Режим игры">
+      <button class="leaderboard-tab" data-mode="3" role="tab">3 в ряд</button>
+      <button class="leaderboard-tab" data-mode="4" role="tab">4 в ряд</button>
     </div>
-    <div id="debug-body"></div>
+    <ol id="leaderboard-list"></ol>
+    <button id="leaderboard-close">Закрыть</button>
   </div>
 </div>
 
@@ -185,6 +183,9 @@ const ADSGRAM_INTERSTITIAL_BLOCK = 'int-61274';
 const MAX_REWARDED_PER_GAME = 5;
 const INTERSTITIAL_EVERY_N_GAMES = 3;
 
+/* ============ SUPABASE LEADERBOARD ============ */
+const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
+
 /* ============ TELEGRAM INIT ============ */
 if (window.Telegram && window.Telegram.WebApp) {
   try {
@@ -198,9 +199,27 @@ function haptic(type){
   type = type || 'light';
   if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
     try { window.Telegram.WebApp.HapticFeedback.impactOccurred(type); } catch(e){}
-  } else if ('vibrate' in navigator) {
-    try { navigator.vibrate(15); } catch(e){}
   }
+  if ('vibrate' in navigator) {
+    try { navigator.vibrate(type === 'heavy' ? [35,18,55] : type === 'medium' ? 28 : 12); } catch(e){}
+  }
+}
+
+let popAudio = null;
+function playLinePop(){
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    if(!popAudio) popAudio = new AC();
+    if(popAudio.state === 'suspended') popAudio.resume();
+    const t = popAudio.currentTime;
+    const osc = popAudio.createOscillator(), gain = popAudio.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(210,t);
+    osc.frequency.exponentialRampToValueAtTime(58,t+0.13);
+    gain.gain.setValueAtTime(0.0001,t); gain.gain.exponentialRampToValueAtTime(0.32,t+0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001,t+0.19);
+    osc.connect(gain); gain.connect(popAudio.destination); osc.start(t); osc.stop(t+0.2);
+  } catch(e){}
 }
 
 /* ============ ADSGRAM INIT ============ */
@@ -220,32 +239,19 @@ try {
   }
 } catch(e){ console.warn('[AdsGram] init failed', e); }
 
-// Промис-обёртки с debug-fallback
+// Реклама не симулируется: награда выдаётся только после реального rewarded callback.
 function showRewardedAd(){
-  return new Promise((resolve) => {
-    if (!rewardedAdCtl) {
-      console.log('[ads] rewarded fallback (simulate)');
-      setTimeout(() => resolve({ done: true }), 200);
-      return;
-    }
-    rewardedAdCtl.show().then(resolve).catch((err) => {
-      console.warn('[ads] rewarded failed', err);
-      resolve({ done: false });
-    });
+  if (!rewardedAdCtl) return Promise.resolve({ done:false, unavailable:true });
+  return rewardedAdCtl.show().catch((err) => {
+    console.warn('[ads] rewarded failed', err);
+    return { done:false };
   });
 }
-
 function showInterstitialAd(){
-  return new Promise((resolve) => {
-    if (!interstitialAdCtl) {
-      console.log('[ads] interstitial fallback (simulate)');
-      setTimeout(() => resolve({ done: true }), 200);
-      return;
-    }
-    interstitialAdCtl.show().then(resolve).catch((err) => {
-      console.warn('[ads] interstitial failed', err);
-      resolve({ done: false });
-    });
+  if (!interstitialAdCtl) return Promise.resolve({ done:false, unavailable:true });
+  return interstitialAdCtl.show().catch((err) => {
+    console.warn('[ads] interstitial failed', err);
+    return { done:false };
   });
 }
 
@@ -284,26 +290,27 @@ if (lineMode !== 3 && lineMode !== 4) lineMode = 4;
 let gamesCompleted = +(localStorage.getItem('arrowsTideGamesCompleted') || 0);
 
 let board, pieces, score = 0, best = 0, nextId = 1;
+let leaderboardMode = lineMode;
+
+function bestStorageKey(mode){ return 'arrowsTideBest_' + mode; }
+function readBest(mode){
+  const saved = localStorage.getItem(bestStorageKey(mode));
+  if(saved !== null) return Math.max(0, Number(saved) || 0);
+  // Совместимость со старой версией: старый общий рекорд переносим в режим 4.
+  return mode === 4 ? Math.max(0, Number(localStorage.getItem('arrowsTideBest')) || 0) : 0;
+}
 let anim = { active: false };
 let drag = null, gameOver = false;
 let powerups = { bomb: 0, firework: 0, eraser: 0 };
 let rewardedThisGame = 0;
-let nextPowerupAt = 400;
+let rewardedRequestInFlight = false;
 let targeting = null;
 let turnCounter = 0;
 let rescueActive = false;
 let targetingFromRescue = false;
 
 /* ============ LOG ============ */
-function logEvent(text, cls){
-  const body = document.getElementById('debug-body');
-  const line = document.createElement('div');
-  line.className = 'log-line ' + (cls || '');
-  line.textContent = text;
-  body.appendChild(line);
-  while(body.children.length > 300) body.removeChild(body.firstChild);
-  body.scrollTop = body.scrollHeight;
-}
+function logEvent(){ /* debug panel intentionally removed */ }
 
 function updateModeButton(){
   document.getElementById('mode-btn').textContent = lineMode + ' в ряд';
@@ -438,14 +445,19 @@ function computeTide(){
     if(!canMerge) for(const id of group) state[id] = 'stay';
   }
 
-  // Pass 3: move → stay если цель занята stay
-  for(const id of ids){
-    if(state[id] !== 'move') continue;
-    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
-    const tx = p.x+d[0], ty = p.y+d[1];
-    if(!inB(tx,ty)) continue;
-    const t = board[idx(tx,ty)];
-    if(t && state[t.id] === 'stay') state[id] = 'stay';
+  // Pass 3: распространяем блокировку по всей цепочке до устойчивого состояния.
+  // Если стрелка остаётся на месте, все стрелки, упирающиеся в неё, тоже остаются.
+  for(let pass=0; pass<ids.length; pass++){
+    let changed = false;
+    for(const id of ids){
+      if(state[id] !== 'move') continue;
+      const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+      const tx = p.x+d[0], ty = p.y+d[1];
+      if(!inB(tx,ty)) continue;
+      const t = board[idx(tx,ty)];
+      if(t && state[t.id] === 'stay'){ state[id] = 'stay'; changed = true; }
+    }
+    if(!changed) break;
   }
 
   const nb = board.map(a=>a?{...a}:null);
@@ -547,10 +559,14 @@ function findLines(b, threshold){
   return {cells: cellsSet, lines};
 }
 
-function scoreLine(len, threshold){
+function scoreLine(cells, threshold, b){
   threshold = threshold || lineMode;
-  const per = 12 + (len - threshold) * 6;
-  return len * per;
+  // Каждая стрелка даёт базовые 12 очков, +6 за длину сверх порога,
+  // и +12 за каждый уровень выше первого.
+  const list = Array.isArray(cells) ? cells : null;
+  if(list && b) return list.reduce((sum,p)=>sum + 12 + (list.length-threshold)*6 + Math.max(0,(b[idx(p.x,p.y)]?.level||1)-1)*12,0);
+  const len = Number(cells) || 0;
+  return len * (12 + (len-threshold)*6);
 }
 
 /* ============ GAME FLOW ============ */
@@ -584,19 +600,11 @@ function placePiece(i,gx,gy){
 
 function addScore(pts){
   score += pts;
-  while(score >= nextPowerupAt){
-    const key = PU_KEYS[(Math.random()*3)|0];
-    if(powerups[key] < 5){
-      powerups[key]++;
-      logEvent('🎁 +1 ' + PU_ICONS[key] + ' за ' + nextPowerupAt + ' очков', 'log-powerup');
-    }
-    nextPowerupAt += 400;
-  }
   updateHud();
 }
 
 function anyPowerupAvailable(){ return powerups.bomb>0 || powerups.firework>0 || powerups.eraser>0; }
-function canWatchAd(){ return rewardedThisGame < MAX_REWARDED_PER_GAME; }
+function canWatchAd(){ return !!rewardedAdCtl && !rewardedRequestInFlight && rewardedThisGame < MAX_REWARDED_PER_GAME; }
 
 function endTurn(){
   if(pieces.every(p=>p.used)){
@@ -614,14 +622,111 @@ function endTurn(){
   }
 }
 
+async function leaderboardRequest(action, mode, score = null) {
+  const initData = window.Telegram?.WebApp?.initData;
+  if (!initData) {
+    throw new Error('Открой игру через Telegram — данные авторизации недоступны.');
+  }
+
+  const response = await fetch(LEADERBOARD_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, mode, score, initData })
+  });
+
+  let result;
+  try { result = await response.json(); }
+  catch (_) { throw new Error('Сервер вернул некорректный ответ.'); }
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || `Ошибка таблицы лидеров (${response.status})`);
+  }
+  return result;
+}
+
+let leaderboardRequestId = 0;
+
+async function renderLeaderboard(){
+  const list = document.getElementById('leaderboard-list');
+  const requestedMode = leaderboardMode;
+  const requestId = ++leaderboardRequestId;
+
+  document.querySelectorAll('.leaderboard-tab').forEach(btn => {
+    const active = Number(btn.dataset.mode) === requestedMode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  list.innerHTML = '<li>Загрузка результатов...</li>';
+  try {
+    const result = await leaderboardRequest('top', requestedMode);
+    if (requestId !== leaderboardRequestId || requestedMode !== leaderboardMode) return;
+
+    list.innerHTML = '';
+    const rows = Array.isArray(result.rows) ? result.rows : [];
+    if (!rows.length) {
+      const li = document.createElement('li');
+      li.textContent = 'Пока нет результатов в режиме ' + requestedMode + ' в ряд';
+      list.appendChild(li);
+      return;
+    }
+
+    rows.forEach((r, i) => {
+      const li = document.createElement('li');
+      const left = document.createElement('span');
+      const playerName = r.display_name || (r.username ? '@' + r.username : 'Игрок');
+      left.textContent = (i + 1) + '. ' + playerName + ' — ' + Number(r.best_score || 0) + ' очков';
+      li.appendChild(left);
+      list.appendChild(li);
+    });
+  } catch (error) {
+    if (requestId !== leaderboardRequestId) return;
+    console.error('[Leaderboard] Load failed:', error);
+    list.innerHTML = '';
+    const li = document.createElement('li');
+    li.textContent = 'Не удалось загрузить таблицу. ' + (error.message || 'Попробуй ещё раз.');
+    list.appendChild(li);
+  }
+}
+
+async function submitLeaderboardScore(){
+  try {
+    await leaderboardRequest('submit', lineMode, score);
+    console.info('[Leaderboard] Score submitted:', score, 'mode:', lineMode);
+  } catch (error) {
+    console.error('[Leaderboard] Submit failed:', error);
+  }
+}
+
+function openLeaderboard(){
+  leaderboardMode = lineMode;
+  document.getElementById('leaderboard').style.display = 'flex';
+  renderLeaderboard();
+}
+function closeLeaderboard(){ document.getElementById('leaderboard').style.display='none'; }
+document.getElementById('leaderboard-btn').onclick = openLeaderboard;
+document.querySelectorAll('.leaderboard-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    leaderboardMode = Number(btn.dataset.mode) === 3 ? 3 : 4;
+    renderLeaderboard();
+  });
+});
+document.getElementById('leaderboard-close').onclick = closeLeaderboard;
+document.getElementById('leaderboard').addEventListener('click',e=>{ if(e.target.id==='leaderboard') closeLeaderboard(); });
+
 function realGameOver(){
   gameOver = true;
   gamesCompleted++;
   localStorage.setItem('arrowsTideGamesCompleted', gamesCompleted);
-  if(score > best){ best = score; localStorage.setItem('arrowsTideBest', best); }
+  submitLeaderboardScore();
+  if(score > best){
+    best = score;
+    localStorage.setItem(bestStorageKey(lineMode), best);
+    if(lineMode === 4) localStorage.setItem('arrowsTideBest', best);
+  }
   updateHud();
   logEvent('🏁 КОНЕЦ ИГРЫ. Счёт: ' + score + ' (игр сыграно: ' + gamesCompleted + ')', 'log-gameover');
-  document.getElementById('finalScore').textContent = 'Счёт: ' + score;
+  document.getElementById('finalScore').textContent = 'Счёт: ' + score + ' · режим ' + lineMode + ' в ряд';
   document.getElementById('over').style.display = 'flex';
 }
 
@@ -677,11 +782,14 @@ document.getElementById('rescueGiveUp').onclick = () => {
 
 /* ============ REWARDED AD ============ */
 function requestPowerupViaAd(type, onSuccess, onFail){
+  if(!rewardedAdCtl){ onFail && onFail('unavailable'); return; }
+  if(rewardedRequestInFlight){ onFail && onFail('inflight'); return; }
   if(rewardedThisGame >= MAX_REWARDED_PER_GAME){
     logEvent('⚠️ Лимит рекламы: ' + MAX_REWARDED_PER_GAME + ' за раунд', 'log-system');
     onFail && onFail('limit');
     return;
   }
+  rewardedRequestInFlight = true;
   logEvent('📺 Запрос Rewarded Ad...', 'log-ad');
   showRewardedAd().then((result) => {
     if(result && result.done){
@@ -698,7 +806,7 @@ function requestPowerupViaAd(type, onSuccess, onFail){
   }).catch((err) => {
     logEvent('📺 Ошибка рекламы', 'log-ad');
     onFail && onFail('error');
-  });
+  }).finally(() => { rewardedRequestInFlight = false; });
 }
 
 /* ============ INTERSTITIAL AD ============ */
@@ -720,12 +828,13 @@ function handleDone(a){
     if(li.cells.size){
       let total = 0;
       for(const ln of li.lines){
-        const sc = scoreLine(ln.cells.length, lineMode);
+        const sc = scoreLine(ln.cells, lineMode, board);
         total += sc;
         const n = ln.cells.length;
         const tag = n === lineMode ? '(базово)' : '(бонус ×' + (1 + (n - lineMode) * 0.5) + ')';
         const cls = n > lineMode ? 'log-bonus' : 'log-pop';
-        logEvent('💥 ' + (ln.type==='row'?'Строка ':'Столбец ') + (ln.index+1) + ': ' + n + ' клеток ' + COLOR_NAMES[ln.color] + ', +' + sc + ' ' + tag, cls);
+        const levelBonus = ln.cells.reduce((sum,p)=>sum+Math.max(0,(board[idx(p.x,p.y)]?.level||1)-1)*12,0);
+        logEvent('💥 ' + (ln.type==='row'?'Строка ':'Столбец ') + (ln.index+1) + ': ' + n + ' клеток ' + COLOR_NAMES[ln.color] + ', +' + sc + (levelBonus ? ' (уровни +' + levelBonus + ')' : '') + ' ' + tag, cls);
       }
       if(li.lines.length > 1){
         logEvent('✨ КАСКАД: ' + li.lines.length + ' линий! Итог: +' + total, 'log-bonus');
@@ -738,7 +847,8 @@ function handleDone(a){
       }
       addScore(total);
       haptic('heavy');
-      anim = {active:true, kind:'pop', t:0, dur:0.24, pops};
+      playLinePop();
+      anim = {active:true, kind:'pop', t:0, dur:0.42, pops};
     } else { logEvent('✓ Ход завершён', 'log-system'); endTurn(); }
   } else if(a.kind==='pop') endTurn();
 }
@@ -784,7 +894,6 @@ function handlePowerupTap(i){
 }
 
 function applyBomb(cx,cy){
-  targetingFromRescue = false;
   const pops = [];
   for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
     const x=cx+dx, y=cy+dy;
@@ -794,7 +903,12 @@ function applyBomb(cx,cy){
       board[idx(x,y)] = null;
     }
   }
-  if(pops.length === 0) return;
+  if(pops.length === 0){
+    // Пустая клетка не расходует бомбу и не отменяет выбор цели.
+    if(targetingFromRescue) rescueActive = false;
+    return;
+  }
+  targetingFromRescue = false;
   targeting = null; powerups.bomb--;
   addScore(pops.length * 8);
   haptic('heavy');
@@ -850,6 +964,46 @@ function handleTargetTap(x,y){
 }
 
 /* ============ DRAW ============ */
+
+function drawPowerupGlyph(g, type, cx, cy, size){
+  // Векторные значки вместо emoji-шрифта: одинаково отображаются в браузерах
+  // Telegram WebView, даже если системный emoji-шрифт недоступен.
+  g.save();
+  g.translate(cx, cy);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  if(type === 0){ // Бомба
+    g.fillStyle = '#ff9f43';
+    g.beginPath(); g.arc(0, 2, size*0.29, 0, Math.PI*2); g.fill();
+    g.strokeStyle = '#ffe0a3'; g.lineWidth = Math.max(2,size*0.07);
+    g.beginPath(); g.moveTo(size*0.10,-size*0.23); g.lineTo(size*0.22,-size*0.39); g.stroke();
+    g.fillStyle = '#fff176';
+    g.beginPath(); g.arc(size*0.25,-size*0.42,size*0.07,0,Math.PI*2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.55)';
+    g.beginPath(); g.arc(-size*0.10,-size*0.08,size*0.07,0,Math.PI*2); g.fill();
+  } else if(type === 1){ // Фейерверк
+    g.strokeStyle = '#e879f9'; g.lineWidth = Math.max(2,size*0.075);
+    for(let k=0;k<8;k++){
+      const a = k*Math.PI/4;
+      g.beginPath();
+      g.moveTo(Math.cos(a)*size*0.13,Math.sin(a)*size*0.13);
+      g.lineTo(Math.cos(a)*size*0.39,Math.sin(a)*size*0.39);
+      g.stroke();
+    }
+    g.fillStyle = '#fff176';
+    g.beginPath(); g.arc(0,0,size*0.12,0,Math.PI*2); g.fill();
+  } else { // Кисть/ластик
+    g.rotate(-Math.PI/4);
+    g.fillStyle = '#4fc3f7';
+    rrect(g,-size*0.16,-size*0.34,size*0.32,size*0.53,size*0.08); g.fill();
+    g.fillStyle = '#f8fafc';
+    rrect(g,-size*0.16,size*0.12,size*0.32,size*0.20,size*0.05); g.fill();
+    g.strokeStyle = '#d9f3ff'; g.lineWidth = Math.max(1.5,size*0.035);
+    g.strokeRect(-size*0.16,-size*0.34,size*0.32,size*0.66);
+  }
+  g.restore();
+}
+
 function drawPowerups(){
   const slotW = W/3, cy = W + TRAY + PU_ROW/2, R = 30;
   for(let i=0;i<3;i++){
@@ -866,8 +1020,8 @@ function drawPowerups(){
     else { ctx.fillStyle='rgba(255,255,255,0.03)'; ctx.strokeStyle='rgba(255,255,255,0.08)'; }
     ctx.fill(); ctx.lineWidth=2; ctx.stroke();
     ctx.save(); ctx.globalAlpha = (avail || canAd) ? 1 : 0.3;
-    ctx.font='30px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(PU_ICONS[i], cx, cy+2); ctx.restore();
+    drawPowerupGlyph(ctx, i, cx, cy+1, 38);
+    ctx.restore();
     if(cnt>0){
       ctx.beginPath(); ctx.arc(cx+R*0.72, cy-R*0.72, 12, 0, Math.PI*2);
       ctx.fillStyle = isT ? '#2196f3' : '#ff6b6b'; ctx.fill();
@@ -905,7 +1059,7 @@ function draw(){
     }
     if(anim.active && anim.kind==='pop'){
       const k = anim.t/anim.dur;
-      for(const p of anim.pops) drawArrow((p.x+0.5)*CELL, (p.y+0.5)*CELL, CELL, COLORS[p.color], p.dir, p.level, 1-k);
+      for(const p of anim.pops){ const pulse=1-k; drawArrow((p.x+0.5)*CELL, (p.y+0.5)*CELL, CELL*(0.55+0.45*pulse), COLORS[p.color], p.dir, p.level, pulse*pulse); }
     }
   }
   const slotW = W/3;
@@ -1080,7 +1234,7 @@ const TUT_SLIDES = [
     get title(){ return '💥 Линия из ' + lineMode; },
     get text(){
       const total = lineMode * 12;
-      return lineMode + ' одинаковых стрелок в ряд лопаются. За каждую +12 очков, итого +' + total + '.';
+      return lineMode + ' одинаковых по цвету стрелок в ряд лопаются. Базовые очки за клетку + бонус за длину линии и уровень стрелки.';
     },
     draw(g, t){
       const c = t % 3;
@@ -1122,7 +1276,7 @@ const TUT_SLIDES = [
       }
     }
   },
-  { title: '🎁 Пауэрапы', text: '💣 Бомба 3×3 · 🎆 Фейерверк — 9 случайных · 🎨 Кисть — все стрелки одного цвета. Стартуешь с 0: смотри рекламу (макс 5/игру) или получай за очки.', draw(g,t){
+  { title: '🎁 Пауэрапы', text: '💣 Бомба 3×3 · 🎆 Фейерверк — до 9 случайных · 🎨 Кисть — все стрелки одного цвета. Пауэрапы можно получить за просмотр доступной рекламы (макс. 5 за игру); за очки они не выдаются.', draw(g,t){
     const pulse = 0.5 + 0.5 * Math.sin(t * 2);
     const icons = ['💣', '🎆', '🎨']; const clr = ['#ff9800', '#e040fb', '#4fc3f7'];
     for(let i=0;i<3;i++){
@@ -1139,7 +1293,7 @@ const TUT_SLIDES = [
       g.fillText('📺', x + 22, TUT_H/2 - 22);
     }
   }},
-  { title: '🚨 Спасение', text: 'Если ходов нет — игра предложит помощь. Используй пауэрап или посмотри рекламу, чтобы получить его (учитывается в лимит 5).', draw(g,t){
+  { title: '🚨 Спасение', text: 'Если ходов нет — используй накопленный пауэрап или получи один за доступный просмотр рекламы (макс. 5 за игру).', draw(g,t){
     for(let y=0;y<4;y++) for(let x=0;x<4;x++){
       rrect(g, x*50+2, y*50+2, 46, 46, 8);
       g.fillStyle = 'rgba(255,255,255,0.05)'; g.fill();
@@ -1216,9 +1370,64 @@ document.addEventListener('keydown', e=>{
 document.getElementById('mode-btn').onclick = () => {
   lineMode = lineMode === 3 ? 4 : 3;
   localStorage.setItem('arrowsTideLineMode', lineMode);
-  updateModeButton();
-  logEvent('🔧 Режим линий: ' + lineMode + ' в ряд', 'log-system');
+  init(); // переключение 3↔4 всегда запускает новую партию с чистого поля
 };
+
+/* ============ АВТОТЕСТЫ ЛОГИКИ ============ */
+function runLogicTests(){
+  const original = board;
+  const results = [];
+  const test = (name, fn) => { try { if(!fn()) throw new Error('assertion failed'); results.push({name,ok:true}); }
+    catch(e){ results.push({name,ok:false,error:String(e)}); } };
+  const empty = () => new Array(N*N).fill(null);
+  test('цепочка блокируется до конца', () => {
+    board=empty();
+    board[idx(0,0)]={id:1,color:0,level:1,dir:1};
+    board[idx(1,0)]={id:2,color:1,level:1,dir:1};
+    board[idx(2,0)]={id:3,color:2,level:1,dir:0}; // у стены, остаётся
+    const r=computeTide();
+    return !!r.nb[idx(0,0)] && !!r.nb[idx(1,0)] && !!r.nb[idx(2,0)];
+  });
+  test('встречные стрелки разворачиваются', () => {
+    board=empty(); board[idx(1,1)]={id:1,color:0,level:1,dir:1}; board[idx(2,1)]={id:2,color:1,level:1,dir:3};
+    const r=computeTide(); return r.nb[idx(1,1)].dir===3 && r.nb[idx(2,1)].dir===1;
+  });
+  test('блокировка после конфликта распространяется по цепочке', () => {
+    board=empty();
+    board[idx(0,1)]={id:1,color:0,level:1,dir:1};
+    board[idx(1,1)]={id:2,color:1,level:1,dir:1};
+    board[idx(2,1)]={id:3,color:2,level:1,dir:1};
+    board[idx(3,0)]={id:4,color:3,level:1,dir:2};
+    const r=computeTide();
+    return !!r.nb[idx(0,1)] && !!r.nb[idx(1,1)] && !!r.nb[idx(2,1)] && !!r.nb[idx(3,0)] && !r.nb[idx(3,1)];
+  });
+  test('слияние одинаковых цвета и уровня', () => {
+    board=empty(); board[idx(1,0)]={id:1,color:0,level:2,dir:2}; board[idx(1,2)]={id:2,color:0,level:2,dir:0};
+    const r=computeTide(); return r.nb[idx(1,1)]?.level===3;
+  });
+  test('столкновение разных стрелок не перезаписывает клетку', () => {
+    board=empty(); board[idx(1,0)]={id:1,color:0,level:1,dir:2}; board[idx(1,2)]={id:2,color:1,level:1,dir:0};
+    const r=computeTide(); return !!r.nb[idx(1,0)] && !!r.nb[idx(1,2)] && !r.nb[idx(1,1)];
+  });
+  test('разворот от стены', () => {
+    board=empty(); board[idx(0,0)]={id:1,color:0,level:1,dir:0};
+    return computeTide().nb[idx(0,0)].dir===2;
+  });
+  test('линия определяется по цвету', () => {
+    board=empty(); for(let x=0;x<4;x++) board[idx(x,4)]={id:x+1,color:2,level:x+1,dir:1};
+    const l=findLines(board,4); return l.lines.length===1 && l.cells.size===4;
+  });
+  test('уровень увеличивает очки линии', () => {
+    board=empty(); for(let x=0;x<4;x++) board[idx(x,0)]={id:x+1,color:0,level:x===0?3:1,dir:1};
+    const cells=[0,1,2,3].map(x=>({x,y:0})); return scoreLine(cells,4,board)===72;
+  });
+  board=original;
+  window.__arrowsTideTests = results;
+  const failed=results.filter(x=>!x.ok);
+  if(failed.length) console.error('[Стрелки-Прилив] Автотесты не пройдены:',failed);
+  else console.info('[Стрелки-Прилив] Автотесты пройдены:',results.length);
+  return results;
+}
 
 /* ============ INIT ============ */
 function init(){
@@ -1228,22 +1437,17 @@ function init(){
   anim = {active:false};
   powerups = { bomb: 0, firework: 0, eraser: 0 };
   rewardedThisGame = 0;
-  nextPowerupAt = 400;
+  rewardedRequestInFlight = false;
   targeting = null; turnCounter = 0;
   rescueActive = false; targetingFromRescue = false;
-  best = +(localStorage.getItem('arrowsTideBest') || 0);
+  best = readBest(lineMode);
+  leaderboardMode = lineMode;
   updateModeButton();
   updateHud();
   document.getElementById('over').style.display = 'none';
   document.getElementById('rescue').style.display = 'none';
-  document.getElementById('debug-body').innerHTML = '';
-  logEvent('🐛 Debug. Режим: ' + lineMode + ' в ряд. Игр сыграно: ' + gamesCompleted, 'log-system');
-  logEvent('🎁 Пауэрапы: 0/0/0. Реклама: ' + (adsAvailable ? 'AdsGram OK' : 'fallback'), 'log-ad');
 }
 
-document.getElementById('debug-clear').onclick = () => {
-  document.getElementById('debug-body').innerHTML = '';
-};
 
 let lastT = 0;
 function loop(ts){
@@ -1261,6 +1465,7 @@ function loop(ts){
 }
 
 init();
+runLogicTests();
 requestAnimationFrame(loop);
 
 if(!localStorage.getItem('arrowsTideTutorialSeen')){
