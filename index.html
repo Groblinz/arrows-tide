@@ -1,0 +1,1271 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Стрелки-Прилив · Telegram</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#0b1020;color:#e8eefc;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+    touch-action:manipulation;overflow:hidden}
+  #app{display:flex;gap:16px;padding:16px;height:100vh;box-sizing:border-box;
+    overflow:hidden;justify-content:center;align-items:flex-start}
+  #game{position:relative;flex:0 0 auto;width:min(420px,50vw);
+    display:flex;flex-direction:column}
+  #hud{display:flex;justify-content:space-between;align-items:baseline;
+    padding:6px 6px 10px;font-variant-numeric:tabular-nums;gap:8px}
+  #score{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  #best{font-size:13px;opacity:.55}
+  #hud-right{display:flex;align-items:center;gap:6px}
+  #mode-btn{background:rgba(79,195,247,0.15);border:1px solid rgba(79,195,247,0.45);
+    color:#4fc3f7;padding:6px 12px;border-radius:8px;font-family:inherit;
+    font-size:13px;font-weight:600;cursor:pointer}
+  #mode-btn:active{background:rgba(79,195,247,0.3)}
+  #help-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;
+    padding:6px 12px;border-radius:8px;font-family:inherit;font-size:13px;
+    font-weight:600;cursor:pointer}
+  #help-btn:active{background:rgba(255,255,255,0.2)}
+
+  canvas{display:block;width:100%;height:auto;border-radius:18px;
+    touch-action:none;-webkit-user-select:none;-webkit-touch-callout:none;
+    background:radial-gradient(120% 120% at 50% 0%,#16213e 0%,#0b1020 70%);
+    box-shadow:0 10px 40px rgba(0,0,0,.45)}
+
+  #over{position:absolute;inset:0;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;
+    background:rgba(6,10,22,.92);border-radius:18px;backdrop-filter:blur(6px);z-index:6}
+  #over h2{margin:0;font-size:26px}
+  #over p{margin:0;opacity:.7}
+  #over button{padding:13px 30px;border-radius:14px;border:0;font-size:17px;
+    font-weight:700;background:linear-gradient(180deg,#4fc3f7,#2196f3);
+    color:#04101f;cursor:pointer;font-family:inherit}
+
+  #rescue{position:absolute;inset:0;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:12px;
+    background:rgba(40,10,10,.92);border-radius:18px;backdrop-filter:blur(6px);z-index:5;
+    padding:16px}
+  #rescue h2{margin:0;font-size:24px;color:#ff8a80}
+  #rescue p{margin:0;opacity:.75;font-size:13px;text-align:center}
+  #rescueBtns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .rescue-btn{padding:12px 16px;border-radius:14px;border:2px solid rgba(255,255,255,0.15);
+    background:rgba(255,255,255,0.08);color:#e8eefc;font-family:inherit;
+    font-weight:700;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:2px;min-width:72px}
+  .rescue-btn:active{background:rgba(79,195,247,0.28)}
+  .rescue-btn .icon{font-size:26px;line-height:1}
+  .rescue-btn .label{font-size:12px}
+  .rescue-btn .count{font-size:11px;opacity:.6}
+  .rescue-btn.ad-btn .count{color:#ffd54f;opacity:1}
+  #rescueGiveUp{padding:10px 28px;border-radius:12px;border:0;font-size:14px;
+    font-weight:600;background:rgba(255,100,100,0.25);color:#ffb0b0;
+    cursor:pointer;font-family:inherit;margin-top:8px}
+
+  #debug{flex:1 1 320px;min-width:280px;max-width:460px;height:100%;
+    display:flex;flex-direction:column;background:#060a16;
+    border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden}
+  #debug-header{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 12px;background:rgba(255,255,255,0.03);
+    border-bottom:1px solid rgba(255,255,255,0.08);font-size:13px;
+    font-weight:600;flex-shrink:0}
+  #debug-clear{background:rgba(255,255,255,0.08);border:0;color:#e8eefc;
+    padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;
+    font-family:inherit}
+  #debug-body{flex:1 1 auto;overflow-y:auto;padding:8px 12px;
+    font-family:'SF Mono',Menlo,Consolas,monospace;font-size:11.5px;
+    line-height:1.5;color:#c8d3e8}
+  .log-line{padding:1px 0;word-wrap:break-word}
+  .log-system{color:#6e7a95;font-style:italic;border-top:1px solid rgba(255,255,255,.06);margin-top:4px;padding-top:4px}
+  .log-placement{color:#81c784;font-weight:600}
+  .log-merge{color:#ffd54f;font-weight:600}
+  .log-bounce{color:#fff176}
+  .log-reverse{color:#81d4fa;font-weight:600}
+  .log-pop{color:#ff9800;font-weight:700}
+  .log-bonus{color:#e040fb;font-weight:700}
+  .log-powerup{color:#ce93d8;font-weight:600}
+  .log-ad{color:#ffd54f;font-weight:600}
+  .log-rescue{color:#ff5252;font-weight:700}
+  .log-gameover{color:#f44336;font-weight:700}
+
+  #tutorial{position:fixed;inset:0;background:rgba(4,6,14,0.9);display:none;
+    align-items:center;justify-content:center;z-index:100;padding:16px;
+    backdrop-filter:blur(8px)}
+  #tut-card{background:#16213e;border-radius:20px;padding:22px;max-width:400px;
+    width:100%;display:flex;flex-direction:column;align-items:center;gap:14px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);max-height:calc(100vh - 32px);
+    overflow-y:auto}
+  #tut-step{font-size:12px;opacity:.5;font-variant-numeric:tabular-nums;letter-spacing:1px}
+  #tut-title{margin:0;font-size:20px;text-align:center;line-height:1.2}
+  #tut-canvas{background:#0b1020;border-radius:12px;width:240px;height:240px;
+    max-width:100%;touch-action:none}
+  #tut-text{margin:0;text-align:center;line-height:1.55;font-size:14px;
+    opacity:.85;min-height:66px;padding:0 4px}
+  #tut-nav{display:flex;align-items:center;gap:14px;width:100%;justify-content:space-between}
+  #tut-prev,#tut-next{padding:10px 18px;border-radius:12px;border:0;
+    background:rgba(79,195,247,0.2);color:#4fc3f7;font-family:inherit;
+    font-size:14px;font-weight:700;cursor:pointer;min-width:56px}
+  #tut-prev:disabled{opacity:.25;cursor:default}
+  #tut-next{background:linear-gradient(180deg,#4fc3f7,#2196f3);color:#04101f}
+  #tut-dots{display:flex;gap:6px}
+  .tut-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2)}
+  .tut-dot.active{background:#4fc3f7}
+  #tut-skip{padding:8px 20px;border-radius:10px;border:0;background:transparent;
+    color:rgba(255,255,255,0.5);font-family:inherit;font-size:13px;
+    cursor:pointer;margin-top:-4px}
+
+  @media (max-width:900px){
+    #app{flex-direction:column;padding:8px;gap:8px;align-items:center}
+    #game{width:min(100%,calc(60vh * 336 / 530));max-width:100%}
+    #debug{width:100%;max-width:460px;flex:1 1 auto;min-height:100px}
+  }
+  @media (max-height:700px){
+    #tut-canvas{width:180px;height:180px}
+    #tut-text{min-height:56px;font-size:13px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="game">
+    <div id="hud">
+      <div id="score">0</div>
+      <div id="hud-right">
+        <span id="best">рекорд: 0</span>
+        <button id="mode-btn" title="Порог линии">4 в ряд</button>
+        <button id="help-btn" title="Туториал">?</button>
+      </div>
+    </div>
+    <canvas id="c"></canvas>
+    <div id="rescue">
+      <h2>🚨 Ходов нет!</h2>
+      <p id="rescueHint">Выбери пауэрап или посмотри рекламу</p>
+      <div id="rescueBtns"></div>
+      <button id="rescueGiveUp">Сдаться</button>
+    </div>
+    <div id="over">
+      <h2>Игра окончена</h2>
+      <p id="finalScore"></p>
+      <button id="restart">Ещё раз</button>
+    </div>
+  </div>
+  <div id="debug">
+    <div id="debug-header">
+      <span>🐛 Debug Log</span>
+      <button id="debug-clear">Очистить</button>
+    </div>
+    <div id="debug-body"></div>
+  </div>
+</div>
+
+<div id="tutorial">
+  <div id="tut-card">
+    <div id="tut-step">1 / 9</div>
+    <h2 id="tut-title"></h2>
+    <canvas id="tut-canvas" width="200" height="200"></canvas>
+    <p id="tut-text"></p>
+    <div id="tut-nav">
+      <button id="tut-prev">←</button>
+      <div id="tut-dots"></div>
+      <button id="tut-next">→</button>
+    </div>
+    <button id="tut-skip">Пропустить</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============ КОНФИГ РЕКЛАМЫ ============ */
+// ⚠️ Замени на реальные ID из partner.adsgram.ai
+const ADSGRAM_REWARDED_BLOCK = 'REPLACE_ME_REWARDED';
+const ADSGRAM_INTERSTITIAL_BLOCK = 'REPLACE_ME_INTERSTITIAL';
+const MAX_REWARDED_PER_GAME = 5;
+const INTERSTITIAL_EVERY_N_GAMES = 3;
+
+/* ============ TELEGRAM INIT ============ */
+if (window.Telegram && window.Telegram.WebApp) {
+  try {
+    window.Telegram.WebApp.ready();
+    window.Telegram.WebApp.expand();
+    window.Telegram.WebApp.setHeaderColor('#0b1020');
+  } catch(e){}
+}
+
+function haptic(type){
+  type = type || 'light';
+  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+    try { window.Telegram.WebApp.HapticFeedback.impactOccurred(type); } catch(e){}
+  } else if ('vibrate' in navigator) {
+    try { navigator.vibrate(15); } catch(e){}
+  }
+}
+
+/* ============ ADSGRAM INIT ============ */
+let rewardedAdCtl = null;
+let interstitialAdCtl = null;
+let adsAvailable = false;
+
+try {
+  if (window.Adsgram) {
+    if (ADSGRAM_REWARDED_BLOCK && !ADSGRAM_REWARDED_BLOCK.startsWith('REPLACE')) {
+      rewardedAdCtl = window.Adsgram.init({ blockId: ADSGRAM_REWARDED_BLOCK });
+    }
+    if (ADSGRAM_INTERSTITIAL_BLOCK && !ADSGRAM_INTERSTITIAL_BLOCK.startsWith('REPLACE')) {
+      interstitialAdCtl = window.Adsgram.init({ blockId: ADSGRAM_INTERSTITIAL_BLOCK });
+    }
+    adsAvailable = !!(rewardedAdCtl || interstitialAdCtl);
+  }
+} catch(e){ console.warn('[AdsGram] init failed', e); }
+
+// Промис-обёртки с debug-fallback
+function showRewardedAd(){
+  return new Promise((resolve) => {
+    if (!rewardedAdCtl) {
+      console.log('[ads] rewarded fallback (simulate)');
+      setTimeout(() => resolve({ done: true }), 200);
+      return;
+    }
+    rewardedAdCtl.show().then(resolve).catch((err) => {
+      console.warn('[ads] rewarded failed', err);
+      resolve({ done: false });
+    });
+  });
+}
+
+function showInterstitialAd(){
+  return new Promise((resolve) => {
+    if (!interstitialAdCtl) {
+      console.log('[ads] interstitial fallback (simulate)');
+      setTimeout(() => resolve({ done: true }), 200);
+      return;
+    }
+    interstitialAdCtl.show().then(resolve).catch((err) => {
+      console.warn('[ads] interstitial failed', err);
+      resolve({ done: false });
+    });
+  });
+}
+
+/* ============ КОНСТАНТЫ ИГРЫ ============ */
+const N = 6, CELL = 56, W = N * CELL, TRAY = 110, PU_ROW = 84;
+const H = W + TRAY + PU_ROW;
+const COLORS = [[79,195,247],[255,138,101],[174,213,129],[186,104,200]];
+const COLOR_NAMES = ['голубой','оранжевый','зелёный','фиолетовый'];
+const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
+const PU_KEYS = ['bomb','firework','eraser'];
+const PU_ICONS = ['💣','🎆','🎨'];
+const PU_LABELS = ['Бомба','Фейерверк','Кисть'];
+
+const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+cvs.width = W * DPR; cvs.height = H * DPR;
+cvs.style.aspectRatio = W + '/' + H;
+ctx.scale(DPR, DPR);
+
+const idx = (x,y) => y*N + x;
+const inB = (x,y) => x>=0 && y>=0 && x<N && y<N;
+const col = (c,a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const posStr = (p) => `(${p.x+1},${p.y+1})`;
+
+const SHAPES = [
+  [[0,0]], [[0,0],[1,0]], [[0,0],[0,1]],
+  [[0,0],[1,0],[2,0]], [[0,0],[0,1],[0,2]],
+  [[0,0],[1,0],[0,1]], [[0,0],[1,0],[1,1]], [[0,0],[0,1],[1,1]],
+];
+
+/* ============ СОСТОЯНИЕ ============ */
+let lineMode = +(localStorage.getItem('arrowsTideLineMode') || 4);
+if (lineMode !== 3 && lineMode !== 4) lineMode = 4;
+
+let gamesCompleted = +(localStorage.getItem('arrowsTideGamesCompleted') || 0);
+
+let board, pieces, score = 0, best = 0, nextId = 1;
+let anim = { active: false };
+let drag = null, gameOver = false;
+let powerups = { bomb: 0, firework: 0, eraser: 0 };
+let rewardedThisGame = 0;
+let nextPowerupAt = 400;
+let targeting = null;
+let turnCounter = 0;
+let rescueActive = false;
+let targetingFromRescue = false;
+
+/* ============ LOG ============ */
+function logEvent(text, cls){
+  const body = document.getElementById('debug-body');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + (cls || '');
+  line.textContent = text;
+  body.appendChild(line);
+  while(body.children.length > 300) body.removeChild(body.firstChild);
+  body.scrollTop = body.scrollHeight;
+}
+
+function updateModeButton(){
+  document.getElementById('mode-btn').textContent = lineMode + ' в ряд';
+}
+
+/* ============ RENDERING UTILS ============ */
+function rrect(g, x, y, w, h, r){
+  g.beginPath();
+  if(g.roundRect) g.roundRect(x, y, w, h, r);
+  else {
+    g.moveTo(x+r, y);
+    g.arcTo(x+w, y, x+w, y+h, r); g.arcTo(x+w, y+h, x, y+h, r);
+    g.arcTo(x, y+h, x, y, r); g.arcTo(x, y, x+w, y, r);
+    g.closePath();
+  }
+}
+
+function drawArrowG(g, cx, cy, size, c, dir, level, alpha){
+  alpha = alpha === undefined ? 1 : alpha;
+  if(alpha <= 0.01) return;
+  g.save();
+  g.globalAlpha = alpha;
+  g.translate(cx, cy);
+  const r = size * 0.40, rad = r * 0.34;
+  rrect(g, -r, -r, r*2, r*2, rad);
+  g.fillStyle = col(c, 0.18); g.fill();
+  g.lineWidth = Math.max(1.5, size * 0.045);
+  g.strokeStyle = col(c, 0.55); g.stroke();
+  g.save();
+  g.rotate(dir * Math.PI / 2);
+  const a = size * 0.20;
+  g.beginPath();
+  g.moveTo(0, -a*1.25); g.lineTo(a*0.95, a*0.85);
+  g.lineTo(0, a*0.25); g.lineTo(-a*0.95, a*0.85);
+  g.closePath();
+  g.fillStyle = col(c, 1); g.fill();
+  g.restore();
+  if(level > 1){
+    g.fillStyle = col(c, 1);
+    g.font = '700 ' + (size*0.24) + 'px system-ui,sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(level, r*0.45, r*0.55);
+  }
+  g.restore();
+}
+
+function drawArrow(cx,cy,size,c,dir,level,alpha){ drawArrowG(ctx,cx,cy,size,c,dir,level,alpha); }
+
+function drawPiece(p,cx,cy,size){
+  const xs = p.cells.map(c=>c.x), ys = p.cells.map(c=>c.y);
+  const bx = (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
+  const by = (Math.min.apply(null,ys)+Math.max.apply(null,ys))/2;
+  for(const c of p.cells){
+    drawArrow(cx+(c.x-bx)*size, cy+(c.y-by)*size, size, COLORS[p.color], p.dir, 1);
+  }
+}
+
+function newPiece(){
+  const s = SHAPES[(Math.random()*SHAPES.length)|0];
+  return {
+    cells: s.map(c=>({x:c[0],y:c[1]})),
+    color: (Math.random()*COLORS.length)|0,
+    dir: (Math.random()*4)|0,
+    used: false
+  };
+}
+
+/* ============ TIDE (с разворотом встречных) ============ */
+function computeTide(){
+  const posOf = {};
+  for(let i=0;i<N*N;i++) if(board[i]) posOf[board[i].id] = {x:i%N, y:(i/N)|0};
+  const ids = Object.keys(posOf).map(Number);
+  const state = {};
+  ids.forEach(id => state[id] = 'pending');
+
+  // Pass 1: базовое разрешение
+  for(let iter=0; iter<200; iter++){
+    let changed = false;
+    for(const id of ids){
+      if(state[id] !== 'pending') continue;
+      const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+      const tx = p.x+d[0], ty = p.y+d[1];
+      if(!inB(tx,ty)){ state[id]='stay'; changed=true; continue; }
+      const t = board[idx(tx,ty)];
+      if(!t){ state[id]='move'; changed=true; continue; }
+      const ts = state[t.id];
+      if(ts==='stay'){ state[id]='stay'; changed=true; }
+      else if(ts==='move'){ state[id]='move'; changed=true; }
+    }
+    if(!changed && ids.some(id => state[id]==='pending')){
+      for(const id of ids) if(state[id]==='pending') state[id]='move';
+      changed = true;
+    }
+    if(!changed) break;
+  }
+
+  // 🔄 NEW: детект встречных пар (A целится в B, B целится в A)
+  const facing = new Set();
+  for(const id of ids){
+    if(state[id] !== 'move') continue;
+    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+    const tx = p.x + d[0], ty = p.y + d[1];
+    if(!inB(tx, ty)) continue;
+    const t = board[idx(tx, ty)];
+    if(!t || state[t.id] !== 'move') continue;
+    const tp = posOf[t.id], ta = board[idx(tp.x, tp.y)], td = DIRS[ta.dir];
+    const ttx = tp.x + td[0], tty = tp.y + td[1];
+    if(ttx === p.x && tty === p.y){
+      facing.add(id);
+      facing.add(t.id);
+    }
+  }
+  for(const id of facing) state[id] = 'stay';
+
+  // Pass 2: конфликты (2+ в одну клетку без merge)
+  const targets = new Map();
+  for(const id of ids){
+    if(state[id] !== 'move') continue;
+    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+    const ti = idx(p.x+d[0], p.y+d[1]);
+    if(!targets.has(ti)) targets.set(ti, []);
+    targets.get(ti).push(id);
+  }
+  for(const [ti, group] of targets){
+    if(group.length < 2) continue;
+    let canMerge = false;
+    if(group.length === 2){
+      const p0 = posOf[group[0]], p1 = posOf[group[1]];
+      const a1 = board[idx(p0.x,p0.y)], a2 = board[idx(p1.x,p1.y)];
+      if(a1.color === a2.color && a1.level === a2.level) canMerge = true;
+    }
+    if(!canMerge) for(const id of group) state[id] = 'stay';
+  }
+
+  // Pass 3: move → stay если цель занята stay
+  for(const id of ids){
+    if(state[id] !== 'move') continue;
+    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+    const tx = p.x+d[0], ty = p.y+d[1];
+    if(!inB(tx,ty)) continue;
+    const t = board[idx(tx,ty)];
+    if(t && state[t.id] === 'stay') state[id] = 'stay';
+  }
+
+  const nb = board.map(a=>a?{...a}:null);
+  const anims = [], fades = [], events = [];
+
+  for(const id of ids){
+    if(state[id] === 'move'){ const p = posOf[id]; nb[idx(p.x,p.y)] = null; }
+  }
+  const tg = new Map();
+  for(const id of ids){
+    if(state[id] !== 'move') continue;
+    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+    const ti = idx(p.x+d[0], p.y+d[1]);
+    if(!tg.has(ti)) tg.set(ti, []);
+    tg.get(ti).push(id);
+  }
+  for(const [ti, group] of tg){
+    const tx = ti%N, ty = (ti/N)|0;
+    if(group.length === 1){
+      const id = group[0], p = posOf[id], a = board[idx(p.x,p.y)];
+      nb[ti] = {id, color:a.color, level:a.level, dir:a.dir};
+      anims.push({from:p, to:{x:tx,y:ty}, color:a.color, level:a.level, dir:a.dir});
+    } else if(group.length === 2){
+      const p0 = posOf[group[0]], p1 = posOf[group[1]];
+      const a1 = board[idx(p0.x,p0.y)];
+      nb[ti] = {id:group[0], color:a1.color, level:a1.level+1, dir:a1.dir};
+      anims.push({from:p0, to:{x:tx,y:ty}, color:a1.color, level:a1.level+1, dir:a1.dir});
+      fades.push({x:p1.x, y:p1.y, color:a1.color, level:a1.level});
+    }
+  }
+
+  // Финальный stay: стены и встречные → разворот
+  for(const id of ids){
+    if(state[id] !== 'stay') continue;
+    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+    const wallInFront = !inB(p.x+d[0], p.y+d[1]);
+    const isFacing = facing.has(id);
+    if(wallInFront || isFacing){
+      const nd = (a.dir+2)%4;
+      nb[idx(p.x,p.y)] = {...a, dir:nd};
+      anims.push({from:p, to:p, color:a.color, level:a.level, dir:nd});
+      if(wallInFront){
+        events.push({cls:'log-bounce', text:'↩️ Отскок от стены: ' + COLOR_NAMES[a.color] + ' ' + posStr(p)});
+      } else {
+        events.push({cls:'log-reverse', text:'🔄 Разворот (встречная): ' + COLOR_NAMES[a.color] + ' ' + posStr(p)});
+      }
+    } else if(!nb[idx(p.x,p.y)]){
+      nb[idx(p.x,p.y)] = {...a};
+      anims.push({from:p, to:p, color:a.color, level:a.level, dir:a.dir});
+    }
+  }
+
+  // Лог merge
+  for(const id of ids){
+    if(state[id] !== 'move') continue;
+    const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
+    const f = nb[idx(p.x+d[0], p.y+d[1])];
+    if(f && f.level > a.level){
+      events.push({cls:'log-merge', text:'🔥 Слияние: ' + COLOR_NAMES[a.color] + ' ур.' + a.level + ' ' + posStr(p) + (f.id===id ? ' → стало ур.'+f.level : ' поглощена')});
+    }
+  }
+
+  return {nb, anims, fades, events};
+}
+
+/* ============ LINES ============ */
+function findLines(b, threshold){
+  threshold = threshold || lineMode;
+  const cellsSet = new Set();
+  const lines = [];
+  for(let y=0;y<N;y++){
+    let start = 0;
+    for(let x=1;x<=N;x++){
+      const same = x<N && b[idx(x,y)] && b[idx(x-1,y)] && b[idx(x,y)].color===b[idx(x-1,y)].color;
+      if(!same){
+        if(x-start>=threshold){
+          const cells=[];
+          for(let k=start;k<x;k++){ cellsSet.add(idx(k,y)); cells.push({x:k,y}); }
+          lines.push({type:'row', index:y, color:b[idx(start,y)].color, cells});
+        }
+        start = x;
+      }
+    }
+  }
+  for(let x=0;x<N;x++){
+    let start = 0;
+    for(let y=1;y<=N;y++){
+      const same = y<N && b[idx(x,y)] && b[idx(x,y-1)] && b[idx(x,y)].color===b[idx(x,y-1)].color;
+      if(!same){
+        if(y-start>=threshold){
+          const cells=[];
+          for(let k=start;k<y;k++){ cellsSet.add(idx(x,k)); cells.push({x,y:k}); }
+          lines.push({type:'col', index:x, color:b[idx(x,start)].color, cells});
+        }
+        start = y;
+      }
+    }
+  }
+  return {cells: cellsSet, lines};
+}
+
+function scoreLine(len, threshold){
+  threshold = threshold || lineMode;
+  const per = 12 + (len - threshold) * 6;
+  return len * per;
+}
+
+/* ============ GAME FLOW ============ */
+function canPlaceAny(){
+  for(const p of pieces){
+    if(p.used) continue;
+    for(let gy=0;gy<N;gy++) for(let gx=0;gx<N;gx++){
+      let ok = true;
+      for(const c of p.cells){
+        const x=gx+c.x, y=gy+c.y;
+        if(!inB(x,y) || board[idx(x,y)]){ ok=false; break; }
+      }
+      if(ok) return true;
+    }
+  }
+  return false;
+}
+
+function placePiece(i,gx,gy){
+  const p = pieces[i];
+  turnCounter++;
+  logEvent('━━━ Ход ' + turnCounter + ': ' + COLOR_NAMES[p.color] + ' в ' + posStr({x:gx,y:gy}) + ' ━━━', 'log-system');
+  for(const c of p.cells) board[idx(gx+c.x, gy+c.y)] = {id:nextId++, color:p.color, level:1, dir:p.dir};
+  p.used = true;
+  haptic('light');
+  logEvent('📍 Установлено: ' + p.cells.map(c=>posStr({x:gx+c.x,y:gy+c.y})).join(', '), 'log-placement');
+  const t = computeTide();
+  for(const e of t.events) logEvent(e.text, e.cls);
+  anim = {active:true, kind:'tide', t:0, dur:0.16, anims:t.anims, fades:t.fades, nb:t.nb};
+}
+
+function addScore(pts){
+  score += pts;
+  while(score >= nextPowerupAt){
+    const key = PU_KEYS[(Math.random()*3)|0];
+    if(powerups[key] < 5){
+      powerups[key]++;
+      logEvent('🎁 +1 ' + PU_ICONS[key] + ' за ' + nextPowerupAt + ' очков', 'log-powerup');
+    }
+    nextPowerupAt += 400;
+  }
+  updateHud();
+}
+
+function anyPowerupAvailable(){ return powerups.bomb>0 || powerups.firework>0 || powerups.eraser>0; }
+function canWatchAd(){ return rewardedThisGame < MAX_REWARDED_PER_GAME; }
+
+function endTurn(){
+  if(pieces.every(p=>p.used)){
+    pieces = [newPiece(),newPiece(),newPiece()];
+    logEvent('🔄 Новые фигуры', 'log-system');
+  }
+  if(!canPlaceAny()){
+    if(anyPowerupAvailable() || canWatchAd()){
+      rescueActive = true;
+      logEvent('🚨 Нет ходов! Rescue (' + rewardedThisGame + '/' + MAX_REWARDED_PER_GAME + ' реклам)', 'log-rescue');
+      showRescue();
+      return;
+    }
+    realGameOver();
+  }
+}
+
+function realGameOver(){
+  gameOver = true;
+  gamesCompleted++;
+  localStorage.setItem('arrowsTideGamesCompleted', gamesCompleted);
+  if(score > best){ best = score; localStorage.setItem('arrowsTideBest', best); }
+  updateHud();
+  logEvent('🏁 КОНЕЦ ИГРЫ. Счёт: ' + score + ' (игр сыграно: ' + gamesCompleted + ')', 'log-gameover');
+  document.getElementById('finalScore').textContent = 'Счёт: ' + score;
+  document.getElementById('over').style.display = 'flex';
+}
+
+/* ============ RESCUE ============ */
+function showRescue(){
+  const btns = document.getElementById('rescueBtns');
+  btns.innerHTML = '';
+  for(let i=0;i<3;i++){
+    const key = PU_KEYS[i];
+    const count = powerups[key];
+    const canWatchThis = count === 0 && canWatchAd();
+    if(count <= 0 && !canWatchThis) continue;
+    const b = document.createElement('button');
+    b.className = 'rescue-btn' + (count === 0 ? ' ad-btn' : '');
+    const badge = count > 0 ? '×' + count : '📺';
+    b.innerHTML = '<span class="icon">'+PU_ICONS[i]+'</span>' +
+                  '<span class="label">'+PU_LABELS[i]+'</span>' +
+                  '<span class="count">'+badge+'</span>';
+    b.onclick = () => {
+      if(count > 0){
+        pickRescue(key);
+      } else {
+        hideRescue();
+        requestPowerupViaAd(key, () => {
+          showRescue();
+        }, (reason) => {
+          logEvent('⚠️ Реклама не показана: ' + reason, 'log-system');
+          showRescue();
+        });
+      }
+    };
+    btns.appendChild(b);
+  }
+  if(btns.children.length === 0){
+    realGameOver();
+    return;
+  }
+  document.getElementById('rescue').style.display = 'flex';
+}
+function hideRescue(){ document.getElementById('rescue').style.display = 'none'; }
+
+function pickRescue(key){
+  hideRescue();
+  rescueActive = false;
+  if(key === 'firework'){ targetingFromRescue = false; applyFirework(); }
+  else { targeting = key; targetingFromRescue = true; logEvent('🎯 Спасение: ' + PU_ICONS[PU_KEYS.indexOf(key)] + ' — выбери цель', 'log-powerup'); }
+}
+
+document.getElementById('rescueGiveUp').onclick = () => {
+  hideRescue(); rescueActive = false; targeting = null; targetingFromRescue = false;
+  logEvent('🏳️ Сдался', 'log-rescue'); realGameOver();
+};
+
+/* ============ REWARDED AD ============ */
+function requestPowerupViaAd(type, onSuccess, onFail){
+  if(rewardedThisGame >= MAX_REWARDED_PER_GAME){
+    logEvent('⚠️ Лимит рекламы: ' + MAX_REWARDED_PER_GAME + ' за раунд', 'log-system');
+    onFail && onFail('limit');
+    return;
+  }
+  logEvent('📺 Запрос Rewarded Ad...', 'log-ad');
+  showRewardedAd().then((result) => {
+    if(result && result.done){
+      rewardedThisGame++;
+      powerups[type]++;
+      updateHud();
+      logEvent('📺 +1 ' + PU_ICONS[PU_KEYS.indexOf(type)] + ' (' + rewardedThisGame + '/' + MAX_REWARDED_PER_GAME + ')', 'log-ad');
+      haptic('medium');
+      onSuccess && onSuccess();
+    } else {
+      logEvent('📺 Реклама не досмотрена', 'log-ad');
+      onFail && onFail('skipped');
+    }
+  }).catch((err) => {
+    logEvent('📺 Ошибка рекламы', 'log-ad');
+    onFail && onFail('error');
+  });
+}
+
+/* ============ INTERSTITIAL AD ============ */
+document.getElementById('restart').onclick = () => {
+  const shouldShowAd = gamesCompleted > 0 && gamesCompleted % INTERSTITIAL_EVERY_N_GAMES === 0;
+  if(shouldShowAd){
+    logEvent('📺 Interstitial (каждые ' + INTERSTITIAL_EVERY_N_GAMES + ' игр, сейчас ' + gamesCompleted + ')', 'log-ad');
+    showInterstitialAd().then(() => init()).catch(() => init());
+  } else {
+    init();
+  }
+};
+
+/* ============ TIDE DONE ============ */
+function handleDone(a){
+  if(a.kind==='tide'){
+    board = a.nb;
+    const li = findLines(board, lineMode);
+    if(li.cells.size){
+      let total = 0;
+      for(const ln of li.lines){
+        const sc = scoreLine(ln.cells.length, lineMode);
+        total += sc;
+        const n = ln.cells.length;
+        const tag = n === lineMode ? '(базово)' : '(бонус ×' + (1 + (n - lineMode) * 0.5) + ')';
+        const cls = n > lineMode ? 'log-bonus' : 'log-pop';
+        logEvent('💥 ' + (ln.type==='row'?'Строка ':'Столбец ') + (ln.index+1) + ': ' + n + ' клеток ' + COLOR_NAMES[ln.color] + ', +' + sc + ' ' + tag, cls);
+      }
+      if(li.lines.length > 1){
+        logEvent('✨ КАСКАД: ' + li.lines.length + ' линий! Итог: +' + total, 'log-bonus');
+      }
+      const pops = [];
+      for(const i of li.cells){
+        const ar = board[i];
+        pops.push({x:i%N, y:(i/N)|0, color:ar.color, level:ar.level, dir:ar.dir});
+        board[i] = null;
+      }
+      addScore(total);
+      haptic('heavy');
+      anim = {active:true, kind:'pop', t:0, dur:0.24, pops};
+    } else { logEvent('✓ Ход завершён', 'log-system'); endTurn(); }
+  } else if(a.kind==='pop') endTurn();
+}
+
+/* ============ POWERUPS ============ */
+function hitPowerup(x,y){
+  const slotW = W/3, cy = W + TRAY + PU_ROW/2;
+  for(let i=0;i<3;i++){
+    const cx = slotW*(i+0.5);
+    const dx = x-cx, dy = y-cy;
+    if(dx*dx+dy*dy < 42*42) return i;
+  }
+  return -1;
+}
+
+function handlePowerupTap(i){
+  const key = PU_KEYS[i];
+  if(powerups[key] <= 0){
+    // Пытаемся получить за рекламу
+    if(!canWatchAd()){
+      logEvent('⚠️ ' + PU_ICONS[i] + ' нет, реклама исчерпана (' + MAX_REWARDED_PER_GAME + '/раунд)', 'log-system');
+      return;
+    }
+    requestPowerupViaAd(key, () => {
+      logEvent('✅ Получен ' + PU_ICONS[i] + ' — используй его', 'log-ad');
+    }, (r) => {
+      logEvent('⚠️ ' + (r==='limit'?'Лимит рекламы':'Не удалось получить'), 'log-system');
+    });
+    return;
+  }
+  if(key === 'firework'){
+    if(rescueActive){ hideRescue(); rescueActive = false; }
+    targeting = null; applyFirework(); return;
+  }
+  if(targeting === key){
+    targeting = null;
+    if(targetingFromRescue){ targetingFromRescue = false; rescueActive = true; showRescue(); }
+  } else {
+    targeting = key;
+    if(rescueActive){ hideRescue(); rescueActive = false; }
+    targetingFromRescue = false;
+  }
+}
+
+function applyBomb(cx,cy){
+  targetingFromRescue = false;
+  const pops = [];
+  for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+    const x=cx+dx, y=cy+dy;
+    if(inB(x,y) && board[idx(x,y)]){
+      const a = board[idx(x,y)];
+      pops.push({x, y, color:a.color, level:a.level, dir:a.dir});
+      board[idx(x,y)] = null;
+    }
+  }
+  if(pops.length === 0) return;
+  targeting = null; powerups.bomb--;
+  addScore(pops.length * 8);
+  haptic('heavy');
+  logEvent('💣 Уничтожено ' + pops.length, 'log-pop');
+  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+}
+
+function applyEraser(cx,cy){
+  const t = board[idx(cx,cy)];
+  if(!t) return;
+  const c2 = t.color;
+  const pops = [];
+  for(let i=0;i<N*N;i++){
+    if(board[i] && board[i].color === c2){
+      const a = board[i];
+      pops.push({x:i%N, y:(i/N)|0, color:a.color, level:a.level, dir:a.dir});
+      board[i] = null;
+    }
+  }
+  targetingFromRescue = false; targeting = null; powerups.eraser--;
+  addScore(pops.length * 8);
+  haptic('heavy');
+  logEvent('🎨 Стёрто ' + pops.length + ' (' + COLOR_NAMES[c2] + ')', 'log-pop');
+  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+}
+
+function applyFirework(){
+  if(powerups.firework <= 0) return;
+  const occ = [];
+  for(let i=0;i<N*N;i++) if(board[i]) occ.push(i);
+  if(occ.length === 0) return;
+  const cnt = Math.min(9, occ.length);
+  const pops = [];
+  for(let k=0;k<cnt;k++){
+    const j = (Math.random()*occ.length)|0;
+    const i = occ.splice(j,1)[0];
+    const a = board[i];
+    pops.push({x:i%N, y:(i/N)|0, color:a.color, level:a.level, dir:a.dir});
+    board[i] = null;
+  }
+  targetingFromRescue = false; powerups.firework--;
+  addScore(pops.length * 8);
+  haptic('heavy');
+  logEvent('🎆 Уничтожено ' + pops.length, 'log-pop');
+  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+}
+
+function handleTargetTap(x,y){
+  const cx = Math.floor(x/CELL), cy = Math.floor(y/CELL);
+  if(!inB(cx,cy)) return;
+  if(targeting === 'bomb') applyBomb(cx,cy);
+  else if(targeting === 'eraser' && board[idx(cx,cy)]) applyEraser(cx,cy);
+}
+
+/* ============ DRAW ============ */
+function drawPowerups(){
+  const slotW = W/3, cy = W + TRAY + PU_ROW/2, R = 30;
+  for(let i=0;i<3;i++){
+    const key = PU_KEYS[i];
+    const cx = slotW*(i+0.5);
+    const cnt = powerups[key];
+    const avail = cnt > 0;
+    const canAd = cnt === 0 && canWatchAd();
+    const isT = targeting === key;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
+    if(isT){ ctx.fillStyle='rgba(79,195,247,0.35)'; ctx.strokeStyle='rgba(79,195,247,0.95)'; }
+    else if(avail){ ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.strokeStyle='rgba(255,255,255,0.25)'; }
+    else if(canAd){ ctx.fillStyle='rgba(255,213,79,0.15)'; ctx.strokeStyle='rgba(255,213,79,0.55)'; }
+    else { ctx.fillStyle='rgba(255,255,255,0.03)'; ctx.strokeStyle='rgba(255,255,255,0.08)'; }
+    ctx.fill(); ctx.lineWidth=2; ctx.stroke();
+    ctx.save(); ctx.globalAlpha = (avail || canAd) ? 1 : 0.3;
+    ctx.font='30px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(PU_ICONS[i], cx, cy+2); ctx.restore();
+    if(cnt>0){
+      ctx.beginPath(); ctx.arc(cx+R*0.72, cy-R*0.72, 12, 0, Math.PI*2);
+      ctx.fillStyle = isT ? '#2196f3' : '#ff6b6b'; ctx.fill();
+      ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(cnt, cx+R*0.72, cy-R*0.72);
+    } else if(canAd){
+      ctx.beginPath(); ctx.arc(cx+R*0.72, cy-R*0.72, 12, 0, Math.PI*2);
+      ctx.fillStyle = '#ffd54f'; ctx.fill();
+      ctx.font = 'bold 11px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle = '#04101f';
+      ctx.fillText('📺', cx+R*0.72, cy-R*0.72);
+    }
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){
+    rrect(ctx, x*CELL+3, y*CELL+3, CELL-6, CELL-6, 10);
+    ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fill();
+  }
+  if(anim.active && anim.kind==='tide'){
+    const k = 1 - Math.pow(1 - anim.t/anim.dur, 2);
+    for(const a of anim.anims){
+      drawArrow((a.from.x+(a.to.x-a.from.x)*k+0.5)*CELL, (a.from.y+(a.to.y-a.from.y)*k+0.5)*CELL, CELL, COLORS[a.color], a.dir, a.level);
+    }
+    for(const f of anim.fades){
+      const kk = anim.t/anim.dur;
+      drawArrow((f.x+0.5)*CELL, (f.y+0.5)*CELL, CELL, COLORS[f.color], 0, f.level, 1-kk);
+    }
+  } else {
+    for(let i=0;i<N*N;i++){
+      const a = board[i]; if(!a) continue;
+      drawArrow((i%N+0.5)*CELL, (((i/N)|0)+0.5)*CELL, CELL, COLORS[a.color], a.dir, a.level);
+    }
+    if(anim.active && anim.kind==='pop'){
+      const k = anim.t/anim.dur;
+      for(const p of anim.pops) drawArrow((p.x+0.5)*CELL, (p.y+0.5)*CELL, CELL, COLORS[p.color], p.dir, p.level, 1-k);
+    }
+  }
+  const slotW = W/3;
+  for(let i=0;i<3;i++){
+    const p = pieces[i];
+    const cx = slotW*(i+0.5), cy = W + TRAY/2;
+    if(!p || p.used) continue;
+    rrect(ctx, cx-(slotW-16)/2, cy-(TRAY-26)/2, slotW-16, TRAY-26, 14);
+    ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fill();
+    if(drag && drag.i===i) continue;
+    drawPiece(p, cx, cy, 28);
+  }
+  drawPowerups();
+  if(targeting){
+    const text = targeting === 'bomb' ? '💣 Куда ударить?' : '🎨 Какой цвет?';
+    ctx.font='bold 13px system-ui'; const tw = ctx.measureText(text).width + 24;
+    rrect(ctx, W/2-tw/2, 6, tw, 26, 13);
+    ctx.fillStyle='rgba(79,195,247,0.9)'; ctx.fill();
+    ctx.fillStyle='#04101f'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(text, W/2, 19);
+  }
+  if(drag){
+    const p = pieces[drag.i];
+    const g = dragToGrid(drag);
+    if(g){
+      for(const c of p.cells){
+        const x=g.gx+c.x, y=g.gy+c.y;
+        if(!inB(x,y)) continue;
+        rrect(ctx, x*CELL+3, y*CELL+3, CELL-6, CELL-6, 10);
+        ctx.fillStyle = g.valid ? 'rgba(120,255,180,0.18)' : 'rgba(255,90,90,0.18)';
+        ctx.fill();
+      }
+    }
+    drawPiece(p, drag.x-drag.offX, drag.y-drag.offY, CELL);
+  }
+}
+
+/* ============ INPUT ============ */
+function getPos(e){
+  const r = cvs.getBoundingClientRect();
+  return { x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height) };
+}
+
+function dragToGrid(d){
+  const p = pieces[d.i];
+  const cx = d.x-d.offX, cy = d.y-d.offY;
+  const xs = p.cells.map(c=>c.x), ys = p.cells.map(c=>c.y);
+  const bx = (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
+  const by = (Math.min.apply(null,ys)+Math.max.apply(null,ys))/2;
+  const c0x = cx + (p.cells[0].x-bx)*CELL;
+  const c0y = cy + (p.cells[0].y-by)*CELL;
+  const gx = Math.round(c0x/CELL - 0.5) - p.cells[0].x;
+  const gy = Math.round(c0y/CELL - 0.5) - p.cells[0].y;
+  let valid = true;
+  for(const c of p.cells){
+    const x=gx+c.x, y=gy+c.y;
+    if(!inB(x,y) || board[idx(x,y)]){ valid=false; break; }
+  }
+  return {gx, gy, valid};
+}
+
+cvs.addEventListener('pointerdown', e=>{
+  if(gameOver || anim.active || rescueActive) return;
+  if(e.pointerType !== 'mouse') e.preventDefault();
+  const pt = getPos(e);
+  if(pt.y > W + TRAY){
+    const i = hitPowerup(pt.x, pt.y);
+    if(i >= 0) handlePowerupTap(i);
+    return;
+  }
+  if(targeting && pt.y <= W){ handleTargetTap(pt.x, pt.y); return; }
+  if(!targeting && pt.y > W && pt.y <= W + TRAY){
+    const slotW = W/3;
+    const i = Math.floor(pt.x/slotW);
+    if(i>=0 && i<3 && pieces[i] && !pieces[i].used){
+      drag = { i, x:pt.x, y:pt.y, offX: pt.x-slotW*(i+0.5), offY: pt.y-(W+TRAY/2) };
+      try{ cvs.setPointerCapture(e.pointerId); }catch(_){}
+    }
+  }
+}, { passive: false });
+
+cvs.addEventListener('pointermove', e=>{
+  if(!drag) return;
+  if(e.pointerType !== 'mouse') e.preventDefault();
+  const pt = getPos(e);
+  drag.x = pt.x; drag.y = pt.y;
+}, { passive: false });
+
+cvs.addEventListener('pointerup', e=>{
+  if(!drag) return;
+  if(e.pointerType !== 'mouse') e.preventDefault();
+  const pt = getPos(e);
+  drag.x = pt.x; drag.y = pt.y;
+  const g = dragToGrid(drag);
+  const i = drag.i; drag = null;
+  if(g && g.valid) placePiece(i, g.gx, g.gy);
+}, { passive: false });
+
+cvs.addEventListener('pointercancel', ()=>{ drag = null; }, { passive: false });
+
+function updateHud(){
+  document.getElementById('score').textContent = score;
+  document.getElementById('best').textContent = 'рекорд: ' + best;
+}
+
+/* ============ TUTORIAL ============ */
+const tutCanvas = document.getElementById('tut-canvas');
+const tutCtx = tutCanvas.getContext('2d');
+const TUT_DPR = Math.min(window.devicePixelRatio || 1, 2);
+const TUT_W = 200, TUT_H = 200;
+tutCanvas.width = TUT_W * TUT_DPR;
+tutCanvas.height = TUT_H * TUT_DPR;
+tutCtx.scale(TUT_DPR, TUT_DPR);
+
+const TUT_SLIDES = [
+  { title: '👋 Добро пожаловать', text: 'Это «Стрелки-Прилив». Перетащи фигуру из лотка на поле. После каждого хода всё поле оживёт.', draw(g,t){
+    drawArrowG(g, TUT_W/2, TUT_H/2, 60, COLORS[0], 1, 1);
+    drawArrowG(g, TUT_W/2-60, TUT_H/2, 44, COLORS[1], 0, 1);
+    drawArrowG(g, TUT_W/2+60, TUT_H/2, 44, COLORS[2], 2, 1);
+    drawArrowG(g, TUT_W/2, TUT_H/2-60, 44, COLORS[3], 3, 1);
+    drawArrowG(g, TUT_W/2, TUT_H/2+60, 44, COLORS[0], 2, 1);
+  }},
+  { title: '➡️ Прилив', text: 'После каждого хода все стрелки одновременно делают шаг в свою сторону.', draw(g,t){
+    const c = t % 3;
+    let p = 0;
+    if(c >= 0.5 && c < 1.8) p = (c - 0.5) / 1.3;
+    else if(c >= 1.8) p = 1;
+    const x = 50 + 100 * p;
+    drawArrowG(g, x, TUT_H/2, 50, COLORS[0], 1, 1);
+    if(p > 0 && p < 1){
+      for(let i=1;i<=3;i++){
+        const px = x - i*8;
+        if(px > 30) drawArrowG(g, px, TUT_H/2, 50, COLORS[0], 1, 1, Math.max(0, 0.3 - i*0.08));
+      }
+    }
+  }},
+  { title: '↩️ Стена', text: 'Уперевшись в стену, стрелка разворачивается и продолжит идти в обратную сторону.', draw(g,t){
+    const c = t % 3;
+    const dir = c < 1 ? 1 : 3;
+    if(c >= 0.8 && c < 1.3){
+      const a = 1 - (c - 0.8) / 0.5;
+      g.fillStyle = 'rgba(255,255,255,' + (0.4*a) + ')';
+      g.fillRect(175, 75, 25, 50);
+    }
+    drawArrowG(g, 150, TUT_H/2, 50, COLORS[0], dir, 1);
+  }},
+  { title: '🔥 Слияние', text: 'Две одинаковые стрелки (цвет + уровень), придя в одну клетку, сливаются. Уровень растёт: 1+1→2.', draw(g,t){
+    const c = t % 3;
+    let ax = 75, bx = 125, bxa = 1, lvl = 1;
+    if(c >= 0.5 && c < 1.5){ const p = (c - 0.5) / 1.0; ax = 75 + 25 * p; bx = 125 - 25 * p; }
+    else if(c >= 1.5 && c < 1.7){ ax = 100; bx = 100; bxa = 1 - (c - 1.5)/0.2; lvl = 2; }
+    else if(c >= 1.7){ ax = 100; bx = 100; bxa = 0; lvl = 2; }
+    if(bxa > 0.01) drawArrowG(g, bx, TUT_H/2, 50, COLORS[0], 3, 1, bxa);
+    drawArrowG(g, ax, TUT_H/2, 50, COLORS[0], 1, lvl);
+  }},
+  { title: '🔄 Разворот', text: 'Если две стрелки смотрят друг в друга — обе разворачиваются в обратных направлениях. Никто не блокируется навсегда.', draw(g,t){
+    const c = t % 3;
+    let ax = 75, bx = 125, adir = 1, bdir = 3;
+    if(c >= 0.5 && c < 1.5){
+      const f = Math.sin((c - 0.5) * Math.PI) * 0.5 + 0.5;
+      g.strokeStyle = 'rgba(255,213,79,' + f + ')'; g.lineWidth = 2;
+      g.strokeRect(85, 75, 30, 50);
+    } else if(c >= 1.5 && c < 2.2){
+      adir = 3; bdir = 1;
+    } else if(c >= 2.2){
+      adir = 3; bdir = 1;
+    }
+    drawArrowG(g, ax, TUT_H/2, 50, COLORS[0], adir, 1);
+    drawArrowG(g, bx, TUT_H/2, 50, COLORS[1], bdir, 1);
+  }},
+  {
+    get title(){ return '💥 Линия из ' + lineMode; },
+    get text(){
+      const total = lineMode * 12;
+      return lineMode + ' одинаковых стрелок в ряд лопаются. За каждую +12 очков, итого +' + total + '.';
+    },
+    draw(g, t){
+      const c = t % 3;
+      const total = lineMode * 12;
+      let cells, size;
+      if(lineMode === 3){ cells = [40, 100, 160]; size = 60; }
+      else { cells = [25, 75, 125, 175]; size = 50; }
+      if(c < 1.5){
+        const pulse = 1 + 0.08 * Math.sin(c * 10);
+        for(const x of cells) drawArrowG(g, x, TUT_H/2, size * (c > 0.5 ? pulse : 1), COLORS[0], 1, 1);
+      } else if(c < 1.9){
+        const p = (c - 1.5) / 0.4;
+        for(const x of cells) drawArrowG(g, x, TUT_H/2, size, COLORS[0], 1, 1, 1 - p);
+        g.fillStyle = 'rgba(255,152,0,' + (1 - p) + ')';
+        g.font = 'bold 28px system-ui'; g.textAlign='center'; g.textBaseline='middle';
+        g.fillText('+' + total, TUT_W/2, TUT_H/2);
+      }
+    }
+  },
+  {
+    get title(){ return '🌟 Бонус за длину'; },
+    get text(){ return 'Чем длиннее линия — тем больше очков за клетку. Охоться за длинными линиями и крестами!'; },
+    draw(g, t){
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2);
+      const cards = [];
+      for(let i=0; i<3; i++){
+        const n = lineMode + i;
+        cards.push({ n, score: scoreLine(n, lineMode), bonus: i > 0 });
+      }
+      for(let i=0;i<3;i++){
+        const cd = cards[i]; const y = 30 + i * 55;
+        const hl = cd.bonus ? 0.15 * pulse : 0;
+        g.fillStyle = 'rgba(255,255,255,' + (0.05 + hl) + ')';
+        rrect(g, 20, y, TUT_W - 40, 45, 10); g.fill();
+        g.fillStyle = cd.bonus ? 'rgba(224,64,251,0.95)' : 'rgba(255,152,0,0.9)';
+        g.font = 'bold 20px system-ui'; g.textAlign = 'left'; g.textBaseline = 'middle';
+        g.fillText(cd.n + ' в ряд', 35, y + 22);
+        g.textAlign = 'right'; g.fillText('+' + cd.score, TUT_W - 35, y + 22);
+      }
+    }
+  },
+  { title: '🎁 Пауэрапы', text: '💣 Бомба 3×3 · 🎆 Фейерверк — 9 случайных · 🎨 Кисть — все стрелки одного цвета. Стартуешь с 0: смотри рекламу (макс 5/игру) или получай за очки.', draw(g,t){
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2);
+    const icons = ['💣', '🎆', '🎨']; const clr = ['#ff9800', '#e040fb', '#4fc3f7'];
+    for(let i=0;i<3;i++){
+      const x = TUT_W * (i + 0.5) / 3;
+      g.beginPath(); g.arc(x, TUT_H/2, 32, 0, Math.PI*2);
+      g.fillStyle = 'rgba(255,255,255,' + (0.08 + 0.12*pulse) + ')'; g.fill();
+      g.strokeStyle = clr[i]; g.lineWidth = 2; g.stroke();
+      g.font = '32px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#fff'; g.fillText(icons[i], x, TUT_H/2 + 2);
+      // Бейдж "📺"
+      g.beginPath(); g.arc(x + 22, TUT_H/2 - 22, 12, 0, Math.PI*2);
+      g.fillStyle = '#ffd54f'; g.fill();
+      g.font = '11px system-ui'; g.fillStyle = '#04101f';
+      g.fillText('📺', x + 22, TUT_H/2 - 22);
+    }
+  }},
+  { title: '🚨 Спасение', text: 'Если ходов нет — игра предложит помощь. Используй пауэрап или посмотри рекламу, чтобы получить его (учитывается в лимит 5).', draw(g,t){
+    for(let y=0;y<4;y++) for(let x=0;x<4;x++){
+      rrect(g, x*50+2, y*50+2, 46, 46, 8);
+      g.fillStyle = 'rgba(255,255,255,0.05)'; g.fill();
+    }
+    const pattern = [0,1,2,3,1,2,3,0,2,3,0,1,3,0,1,2];
+    for(let i=0;i<16;i++){
+      drawArrowG(g, (i%4)*50 + 25, Math.floor(i/4)*50 + 25, 44, COLORS[pattern[i]], i%4, 1);
+    }
+    g.fillStyle = 'rgba(6,10,22,0.8)'; g.fillRect(0, 0, TUT_W, TUT_H);
+    g.fillStyle = '#ff8a80'; g.font = 'bold 20px system-ui';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('🚨 Ходов нет!', TUT_W/2, TUT_H/2 - 25);
+    g.font = '24px system-ui'; g.fillStyle = '#fff';
+    g.fillText('💣   🎆   🎨', TUT_W/2, TUT_H/2 + 10);
+    g.font = '11px system-ui'; g.fillStyle = 'rgba(255,255,255,0.7)';
+    g.fillText('📺 Получить за рекламу', TUT_W/2, TUT_H/2 + 40);
+  }}
+];
+
+let tutIdx = 0, tutStart = 0, tutRAF = null;
+
+function openTutorial(){
+  document.getElementById('tutorial').style.display = 'flex';
+  tutIdx = 0; tutStart = performance.now(); renderTutSlide();
+  if(!tutRAF) tutRAF = requestAnimationFrame(tutLoop);
+}
+function closeTutorial(){
+  document.getElementById('tutorial').style.display = 'none';
+  if(tutRAF){ cancelAnimationFrame(tutRAF); tutRAF = null; }
+  localStorage.setItem('arrowsTideTutorialSeen', '1');
+}
+function renderTutSlide(){
+  const s = TUT_SLIDES[tutIdx];
+  document.getElementById('tut-step').textContent = (tutIdx+1) + ' / ' + TUT_SLIDES.length;
+  document.getElementById('tut-title').textContent = s.title;
+  document.getElementById('tut-text').textContent = s.text;
+  const dots = document.getElementById('tut-dots');
+  dots.innerHTML = '';
+  for(let i=0;i<TUT_SLIDES.length;i++){
+    const d = document.createElement('span');
+    d.className = 'tut-dot' + (i === tutIdx ? ' active' : '');
+    dots.appendChild(d);
+  }
+  document.getElementById('tut-prev').disabled = tutIdx === 0;
+  document.getElementById('tut-next').textContent = tutIdx === TUT_SLIDES.length - 1 ? 'Понятно!' : '→';
+}
+function nextTut(){
+  if(tutIdx < TUT_SLIDES.length - 1){ tutIdx++; tutStart = performance.now(); renderTutSlide(); }
+  else closeTutorial();
+}
+function prevTut(){ if(tutIdx > 0){ tutIdx--; tutStart = performance.now(); renderTutSlide(); } }
+function tutLoop(ts){
+  tutCtx.clearRect(0, 0, TUT_W, TUT_H);
+  for(let y=0;y<4;y++) for(let x=0;x<4;x++){
+    rrect(tutCtx, x*50+2, y*50+2, 46, 46, 8);
+    tutCtx.fillStyle = 'rgba(255,255,255,0.05)'; tutCtx.fill();
+  }
+  const elapsed = (ts - tutStart) / 1000;
+  TUT_SLIDES[tutIdx].draw(tutCtx, elapsed);
+  tutRAF = requestAnimationFrame(tutLoop);
+}
+
+document.getElementById('tut-prev').onclick = prevTut;
+document.getElementById('tut-next').onclick = nextTut;
+document.getElementById('tut-skip').onclick = closeTutorial;
+document.getElementById('help-btn').onclick = openTutorial;
+document.addEventListener('keydown', e=>{
+  if(document.getElementById('tutorial').style.display !== 'flex') return;
+  if(e.key === 'ArrowRight') nextTut();
+  else if(e.key === 'ArrowLeft') prevTut();
+  else if(e.key === 'Escape') closeTutorial();
+});
+
+document.getElementById('mode-btn').onclick = () => {
+  lineMode = lineMode === 3 ? 4 : 3;
+  localStorage.setItem('arrowsTideLineMode', lineMode);
+  updateModeButton();
+  logEvent('🔧 Режим линий: ' + lineMode + ' в ряд', 'log-system');
+};
+
+/* ============ INIT ============ */
+function init(){
+  board = new Array(N*N).fill(null);
+  pieces = [newPiece(), newPiece(), newPiece()];
+  score = 0; nextId = 1; gameOver = false; drag = null;
+  anim = {active:false};
+  powerups = { bomb: 0, firework: 0, eraser: 0 };
+  rewardedThisGame = 0;
+  nextPowerupAt = 400;
+  targeting = null; turnCounter = 0;
+  rescueActive = false; targetingFromRescue = false;
+  best = +(localStorage.getItem('arrowsTideBest') || 0);
+  updateModeButton();
+  updateHud();
+  document.getElementById('over').style.display = 'none';
+  document.getElementById('rescue').style.display = 'none';
+  document.getElementById('debug-body').innerHTML = '';
+  logEvent('🐛 Debug. Режим: ' + lineMode + ' в ряд. Игр сыграно: ' + gamesCompleted, 'log-system');
+  logEvent('🎁 Пауэрапы: 0/0/0. Реклама: ' + (adsAvailable ? 'AdsGram OK' : 'fallback'), 'log-ad');
+}
+
+document.getElementById('debug-clear').onclick = () => {
+  document.getElementById('debug-body').innerHTML = '';
+};
+
+let lastT = 0;
+function loop(ts){
+  const dt = Math.min(0.05, (ts-lastT)/1000) || 0;
+  lastT = ts;
+  if(anim.active){
+    anim.t += dt;
+    if(anim.t >= anim.dur){
+      const done = anim; anim.active = false;
+      handleDone(done);
+    }
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+init();
+requestAnimationFrame(loop);
+
+if(!localStorage.getItem('arrowsTideTutorialSeen')){
+  setTimeout(openTutorial, 500);
+}
+</script>
+</body>
+</html>
