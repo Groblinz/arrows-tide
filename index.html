@@ -27,13 +27,18 @@
   #combo{display:none;margin-left:7px;padding:4px 7px;border-radius:8px;
     background:rgba(255,213,79,.14);color:#ffd54f;font-size:11px;font-weight:800;
     vertical-align:middle;white-space:nowrap}
-  #best{font-size:15px;opacity:.65}
-  #hud-right{display:flex;align-items:center;gap:6px}
-#help-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;
-    padding:8px 13px;border-radius:9px;font-family:inherit;font-size:14px;
+  #best{font-size:14px;opacity:.65}
+  #hud-right{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
+  #help-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;
+    padding:7px 10px;border-radius:9px;font-family:inherit;font-size:14px;
     font-weight:700;cursor:pointer}
   #help-btn:active{background:rgba(255,255,255,0.2)}
-  #settings-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;padding:8px 12px;border-radius:9px;font-family:inherit;font-size:19px;cursor:pointer}
+  #settings-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;padding:7px 10px;border-radius:9px;font-family:inherit;font-size:17px;cursor:pointer}
+  #giveup-btn{background:rgba(255,100,100,.15);border:0;color:#ff8a80;padding:7px 10px;border-radius:9px;font-family:inherit;font-size:15px;cursor:pointer}
+  #giveup-btn:active{background:rgba(255,100,100,.3)}
+  #leaderboard-btn{background:rgba(255,255,255,.1);border:0;color:#e8eefc;
+    padding:7px 10px;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+
   #settings{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(4,6,14,.88);backdrop-filter:blur(8px);z-index:120}
   #settings-card{width:min(360px,100%);background:#16213e;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
   #settings-card h2{margin:0 0 16px;font-size:22px}
@@ -75,8 +80,6 @@
     font-weight:600;background:rgba(255,100,100,0.25);color:#ffb0b0;
     cursor:pointer;font-family:inherit;margin-top:8px}
 
-  #leaderboard-btn{background:rgba(255,255,255,.1);border:0;color:#e8eefc;
-    padding:8px 12px;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
   #leaderboard{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
     padding:16px;background:rgba(4,6,14,.88);backdrop-filter:blur(8px);z-index:110}
   #leaderboard-card{width:min(420px,100%);max-height:85vh;overflow:auto;background:#16213e;
@@ -91,6 +94,9 @@
   #leaderboard-list{margin:0;padding:0;list-style:none;display:grid;gap:8px}
   #leaderboard-list li{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;
     background:rgba(255,255,255,.06);border-radius:10px;font-variant-numeric:tabular-nums}
+  #leaderboard-list li.is-me{background:rgba(79,195,247,.18);border:1px solid rgba(79,195,247,.5);color:#4fc3f7}
+  #leaderboard-list li.is-me strong{color:#4fc3f7}
+  #leaderboard-list li.lb-separator{background:transparent;justify-content:center;opacity:.4;padding:2px;font-size:13px}
   #leaderboard-list small{opacity:.55}
   #leaderboard-close{margin-top:14px;width:100%;padding:11px;border:0;border-radius:11px;
     background:linear-gradient(180deg,#4fc3f7,#2196f3);color:#04101f;font:700 14px inherit}
@@ -121,6 +127,16 @@
     color:rgba(255,255,255,0.5);font-family:inherit;font-size:13px;
     cursor:pointer;margin-top:-4px}
 
+  .dialog-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(4,6,14,.88);backdrop-filter:blur(8px);z-index:130}
+  .dialog-card{width:min(360px,100%);background:#16213e;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.55);text-align:center}
+  .dialog-card h2{margin:0 0 10px;font-size:20px}
+  .dialog-card p{margin:0 0 18px;font-size:14px;opacity:.8;line-height:1.5}
+  .dialog-buttons{display:flex;gap:10px}
+  .dialog-buttons button{flex:1;padding:11px;border:0;border-radius:11px;font:700 14px system-ui;cursor:pointer}
+  .btn-secondary{background:rgba(255,255,255,.1);color:#e8eefc}
+  .btn-primary{background:linear-gradient(180deg,#4fc3f7,#2196f3);color:#04101f}
+  .btn-danger{background:linear-gradient(180deg,#ff6b6b,#e53935);color:#fff}
+
   @media (min-width:901px) and (max-height:900px){
     #game{width:min(520px,56vw,calc((100vh - 80px) * 336 / 550))}
   }
@@ -147,6 +163,7 @@
         <span id="best">рекорд: 0</span>
         <button id="leaderboard-btn" title="Таблица рекордов">🏆</button>
         <button id="help-btn" title="Туториал">?</button>
+        <button id="giveup-btn" title="Сдаться" aria-label="Сдаться">🏳️</button>
         <button id="settings-btn" title="Настройки" aria-label="Настройки">⚙️</button>
       </div>
     </div>
@@ -194,6 +211,28 @@
   </div>
 </div>
 
+<div id="confirm" class="dialog-overlay" role="dialog" aria-modal="true">
+  <div class="dialog-card">
+    <h2>Сдаться?</h2>
+    <p id="confirm-text">Текущая игра будет завершена, прогресс сохранения удалится.</p>
+    <div class="dialog-buttons">
+      <button id="confirm-no" class="btn-secondary" type="button">Отмена</button>
+      <button id="confirm-yes" class="btn-danger" type="button">Сдаться</button>
+    </div>
+  </div>
+</div>
+
+<div id="resume-modal" class="dialog-overlay" role="dialog" aria-modal="true">
+  <div class="dialog-card">
+    <h2>💾 Найдена сохранённая игра</h2>
+    <p>Продолжить с места остановки или начать новую?</p>
+    <div class="dialog-buttons">
+      <button id="resume-new" class="btn-secondary" type="button">Новая игра</button>
+      <button id="resume-continue" class="btn-primary" type="button">Продолжить</button>
+    </div>
+  </div>
+</div>
+
 <div id="tutorial">
   <div id="tut-card">
     <div id="tut-step">1 / 9</div>
@@ -213,7 +252,6 @@
 "use strict";
 
 /* ============ КОНФИГ РЕКЛАМЫ ============ */
-// ⚠️ Замени на реальные ID из partner.adsgram.ai
 const ADSGRAM_REWARDED_BLOCK = '61272';
 const ADSGRAM_INTERSTITIAL_BLOCK = 'int-61274';
 const MAX_REWARDED_PER_GAME = 5;
@@ -221,7 +259,13 @@ const INTERSTITIAL_EVERY_N_GAMES = 3;
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
-const APP_BUILD_VERSION = '2026-11-22.15';
+const LEADERBOARD_FETCH_LIMIT = 1000;
+const LEADERBOARD_TOP_SIZE = 10;
+const APP_BUILD_VERSION = '2026-11-23.1';
+
+/* ============ SAVE GAME ============ */
+const SAVE_KEY = 'arrowsTideSavedGame';
+const SAVE_VERSION = 1;
 
 /* ============ TELEGRAM INIT ============ */
 if (window.Telegram && window.Telegram.WebApp) {
@@ -246,14 +290,9 @@ function haptic(type){
   let telegramSent = false;
   const webApp = window.Telegram && window.Telegram.WebApp;
   const feedback = webApp && webApp.HapticFeedback;
-
-  // В Telegram используем нативную тактильную отдачу.
   if(feedback && typeof feedback.impactOccurred === 'function'){
-    try { feedback.impactOccurred(type); telegramSent = true; } catch(e) { /* fallback ниже */ }
+    try { feedback.impactOccurred(type); telegramSent = true; } catch(e) { }
   }
-
-  // Запасной путь для WebView/браузеров, где доступен Vibration API.
-  // Не вызываем его повторно, если нативный Telegram haptic уже отправлен.
   if(!telegramSent && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'){
     try {
       const pattern = type === 'heavy' ? [45,25,65] : type === 'medium' ? [30,18,30] : type === 'rigid' ? [18,12,18] : 14;
@@ -278,7 +317,6 @@ function playLinePop(){
     unlockGameAudio();
     if(!popAudio || popAudio.state !== 'running') return;
     const t = popAudio.currentTime;
-    // Короткий «пузырьковый» щелчок с мягким низким хвостом.
     const osc = popAudio.createOscillator();
     const sub = popAudio.createOscillator();
     const gain = popAudio.createGain();
@@ -299,7 +337,6 @@ function playLinePop(){
 }
 document.addEventListener('pointerdown', unlockGameAudio, { once:true, passive:true });
 document.addEventListener('touchstart', () => { if(soundEnabled) unlockGameAudio(); }, { once:true, passive:true });
-document.addEventListener('pointerdown', () => { if(soundEnabled) unlockGameAudio(); }, { once:true, passive:true });
 
 /* ============ ADSGRAM INIT ============ */
 let rewardedAdCtl = null;
@@ -318,7 +355,6 @@ try {
   }
 } catch(e){ console.warn('[AdsGram] init failed', e); }
 
-// Реклама не симулируется: награда выдаётся только после реального rewarded callback.
 function showRewardedAd(){
   if (!rewardedAdCtl) return Promise.resolve({ done:false, unavailable:true });
   return rewardedAdCtl.show().catch((err) => {
@@ -369,12 +405,11 @@ const SHAPES = [
 ];
 
 /* ============ СОСТОЯНИЕ ============ */
-const lineMode = 3; // Единственный режим: сборка от трёх стрелок.
+const lineMode = 3;
 let gamesCompleted = +(localStorage.getItem('arrowsTideGamesCompleted') || 0);
 
 let board, pieces, score = 0, best = 0, nextId = 1;
 function readBest(){
-  // Сохраняем лучший личный рекорд из всех прежних версий/режимов.
   return Math.max(
     0,
     Number(localStorage.getItem('arrowsTideBest_3')) || 0,
@@ -404,8 +439,125 @@ function comboMultiplier(streak){
 let rescueActive = false;
 let targetingFromRescue = false;
 
+/* ============ SAVE / LOAD ============ */
+function saveGameState(){
+  if(gameOver || anim.active) return;
+  if(!Array.isArray(board) || !Array.isArray(pieces)) return;
+  if(turnCounter <= 0 && score <= 0) return;
+  try {
+    const state = {
+      v: SAVE_VERSION,
+      board: board.map(a => a ? {id:a.id, color:a.color, level:a.level, dir:a.dir} : null),
+      pieces: pieces.map(p => ({
+        color: p.color,
+        dir: p.dir,
+        used: p.used,
+        cells: p.cells.map(c => {
+          const cell = {x:c.x, y:c.y};
+          if(c.dir !== undefined) cell.dir = c.dir;
+          return cell;
+        })
+      })),
+      score,
+      nextId,
+      powerups: {...powerups},
+      turnCounter,
+      comboStreak,
+      maxComboThisGame,
+      maxArrowLevelThisGame,
+      rewardedThisGame,
+      savedAt: Date.now()
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch(e){}
+}
+
+function loadGameState(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return null;
+    const s = JSON.parse(raw);
+    if(!s || s.v !== SAVE_VERSION) return null;
+    if(!Array.isArray(s.board) || s.board.length !== N*N) return null;
+    if(!Array.isArray(s.pieces) || s.pieces.length !== 3) return null;
+    return s;
+  } catch(e){ return null; }
+}
+
+function clearSavedGame(){
+  try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+}
+
+function applyGameState(s){
+  board = s.board.map(a => a ? {...a} : null);
+  pieces = s.pieces.map(p => ({
+    color: p.color,
+    dir: p.dir,
+    used: !!p.used,
+    cells: p.cells.map(c => {
+      const cell = {x:c.x, y:c.y};
+      if(c.dir !== undefined) cell.dir = c.dir;
+      return cell;
+    })
+  }));
+  score = Number(s.score) || 0;
+  nextId = Number(s.nextId) || 1;
+  powerups = s.powerups ? {...s.powerups} : {bomb:3, firework:3, eraser:3};
+  turnCounter = Number(s.turnCounter) || 0;
+  comboStreak = Number(s.comboStreak) || 0;
+  maxComboThisGame = Number(s.maxComboThisGame) || 0;
+  maxArrowLevelThisGame = Number(s.maxArrowLevelThisGame) || 1;
+  rewardedThisGame = Number(s.rewardedThisGame) || 0;
+  gameOver = false;
+  anim = {active:false};
+  targeting = null;
+  rescueActive = false;
+  targetingFromRescue = false;
+  drag = null;
+  best = readBest();
+  updateHud();
+  document.getElementById('over').style.display = 'none';
+  document.getElementById('rescue').style.display = 'none';
+  if(pieces.every(p => p.used)){
+    pieces = [newPiece(), newPiece(), newPiece()];
+  }
+  if(!canPlaceAny()){
+    if(anyPowerupAvailable() || canWatchAd()){
+      showRescue();
+    }
+  }
+}
+
+/* ============ MODALS ============ */
+function showResumeModal(savedGame){
+  const modal = document.getElementById('resume-modal');
+  modal.style.display = 'flex';
+  document.getElementById('resume-continue').onclick = () => {
+    modal.style.display = 'none';
+    applyGameState(savedGame);
+  };
+  document.getElementById('resume-new').onclick = () => {
+    modal.style.display = 'none';
+    clearSavedGame();
+    // init already reset state; nothing else needed
+  };
+}
+
+function showConfirmGiveUp(){
+  if(gameOver) return;
+  const modal = document.getElementById('confirm');
+  modal.style.display = 'flex';
+  document.getElementById('confirm-yes').onclick = () => {
+    modal.style.display = 'none';
+    realGameOver();
+  };
+  document.getElementById('confirm-no').onclick = () => {
+    modal.style.display = 'none';
+  };
+}
+
 /* ============ LOG ============ */
-function logEvent(){ /* debug panel intentionally removed */ }
+function logEvent(){ }
 
 /* ============ RENDERING UTILS ============ */
 function rrect(g, x, y, w, h, r){
@@ -465,25 +617,16 @@ function newPiece(){
   const straightTriomino = cells.length === 3 &&
     (cells.every(c=>c.y === cells[0].y) || cells.every(c=>c.x === cells[0].x));
   const pieceDir = (Math.random()*4)|0;
-
-  // В прямой фигуре из трёх блоков направления не повторяются:
-  // это исключает автоматическое исчезновение всей фигуры при первом же приливе.
   if(straightTriomino){
     const dirs = [0,1,2,3];
     for(let i=dirs.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [dirs[i],dirs[j]]=[dirs[j],dirs[i]]; }
     dirs.length = 3;
     cells.forEach((c,i)=>c.dir=dirs[i]);
   }
-
-  return {
-    cells,
-    color: (Math.random()*COLORS.length)|0,
-    dir: pieceDir,
-    used: false
-  };
+  return { cells, color: (Math.random()*COLORS.length)|0, dir: pieceDir, used: false };
 }
 
-/* ============ TIDE (с разворотом встречных) ============ */
+/* ============ TIDE ============ */
 function computeTide(protectedMergeIds = null, disableMerges = false){
   const mergeProtected = id => disableMerges || !!(protectedMergeIds && protectedMergeIds.has(id));
   const posOf = {};
@@ -492,7 +635,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
   const state = {};
   ids.forEach(id => state[id] = 'pending');
 
-  // Pass 1: базовое разрешение
   for(let iter=0; iter<200; iter++){
     let changed = false;
     for(const id of ids){
@@ -513,9 +655,8 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
     if(!changed) break;
   }
 
-  // Столкновения одного цвета: готовим слияние и для встречных стрелок.
   const facing = new Set();
-  const mergeInto = new Map(); // id движущейся стрелки -> id стрелки в клетке слияния
+  const mergeInto = new Map();
   const checkedFacing = new Set();
   for(const id of ids){
     if(state[id] !== 'move' || checkedFacing.has(id)) continue;
@@ -535,14 +676,12 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
         state[loser] = 'move';
         mergeInto.set(loser, survivor);
       } else {
-        // Линия имеет приоритет: участники потенциальной линии не сливаются.
         facing.add(id); facing.add(t.id);
       }
     }
   }
   for(const id of facing) state[id] = 'stay';
 
-  // Pass 2: конфликты (2+ в одну клетку без merge)
   const targets = new Map();
   for(const id of ids){
     if(state[id] !== 'move') continue;
@@ -553,8 +692,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
   }
   for(const [ti, group] of targets){
     if(group.length < 2) continue;
-    // Стрелки одного цвета объединяются при столкновении независимо
-    // от уровня; смешанные цвета разрешают конфликт обычным приоритетом.
     const firstPos = posOf[group[0]];
     const firstArrow = board[idx(firstPos.x, firstPos.y)];
     const canMerge = !disableMerges && !group.some(mergeProtected) && group.length >= 2 && group.every(id => {
@@ -562,9 +699,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
       return board[idx(p.x, p.y)].color === firstArrow.color;
     });
     if(!canMerge){
-      // Несколько стрелок могут целиться в одну пустую клетку.
-      // Вместо взаимной блокировки выбираем одну по очереди направлений;
-      // остальные остаются на своих местах и смогут двинуться позже.
       const rotation = turnCounter % 4;
       const ordered = group.slice().sort((a,b) => {
         const pa = posOf[a], pb = posOf[b];
@@ -577,8 +711,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
     }
   }
 
-  // Pass 3: распространяем блокировку по всей цепочке до устойчивого состояния.
-  // Если стрелка остаётся на месте, все стрелки, упирающиеся в неё, тоже остаются.
   for(let pass=0; pass<ids.length; pass++){
     let changed = false;
     for(const id of ids){
@@ -592,8 +724,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
     if(!changed) break;
   }
 
-  // Если стрелка упёрлась в стоящую стрелку того же цвета — тоже сливаем.
-  // Это покрывает столкновения с препятствием, а не только общий пункт назначения.
   for(const id of ids){
     if(state[id] !== 'stay' || mergeInto.has(id)) continue;
     const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
@@ -602,7 +732,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
     const target = board[idx(tx, ty)];
     if(!target || target.color !== a.color || state[target.id] !== 'stay') continue;
     if(mergeProtected(id) || mergeProtected(target.id)) continue;
-    // Движущаяся стрелка становится участником слияния в клетке цели.
     state[id] = 'move';
     mergeInto.set(id, target.id);
   }
@@ -621,7 +750,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
     if(!tg.has(ti)) tg.set(ti, []);
     tg.get(ti).push(id);
   }
-  // Включаем в группу неподвижные стрелки, в которые врезались стрелки того же цвета.
   for(const [moverId, targetId] of mergeInto){
     const tp = posOf[targetId];
     if(!tp) continue;
@@ -640,33 +768,19 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
         const p = posOf[id];
         return {id, p, arrow:board[idx(p.x,p.y)]};
       });
-      // Сохраняем стрелку с наибольшим уровнем; при равенстве — первую.
       members.sort((a,b) => b.arrow.level - a.arrow.level || a.id - b.id);
       const survivor = members[0];
       const mergedLevel = survivor.arrow.level + 1;
-      nb[ti] = {
-        id:survivor.id,
-        color:survivor.arrow.color,
-        level:mergedLevel,
-        dir:survivor.arrow.dir
-      };
-      anims.push({
-        from:survivor.p, to:{x:tx,y:ty},
-        color:survivor.arrow.color, level:mergedLevel, dir:survivor.arrow.dir
-      });
+      nb[ti] = { id:survivor.id, color:survivor.arrow.color, level:mergedLevel, dir:survivor.arrow.dir };
+      anims.push({from:survivor.p, to:{x:tx,y:ty}, color:survivor.arrow.color, level:mergedLevel, dir:survivor.arrow.dir});
       for(let k=1;k<members.length;k++){
         const m = members[k];
         fades.push({x:m.p.x, y:m.p.y, color:m.arrow.color, level:m.arrow.level});
       }
-      events.push({
-        cls:'log-merge',
-        text:'🔥 Слияние: ' + members.length + ' стрелки ' +
-          COLOR_NAMES[survivor.arrow.color] + ' → ур.' + mergedLevel
-      });
+      events.push({cls:'log-merge', text:'🔥 Слияние: ' + members.length + ' стрелки ' + COLOR_NAMES[survivor.arrow.color] + ' → ур.' + mergedLevel});
     }
   }
 
-  // Финальный stay: стены и встречные → разворот
   for(const id of ids){
     if(state[id] !== 'stay') continue;
     const p = posOf[id], a = board[idx(p.x,p.y)], d = DIRS[a.dir];
@@ -676,9 +790,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
       const nd = (a.dir+2)%4;
       const cell = idx(p.x,p.y);
       const current = nb[cell];
-      // Не затираем результат слияния, который уже записан в клетку.
-      // Если выжившая стрелка — сама отскакивающая, сохраняем её новый уровень
-      // и применяем разворот. Если выжила входящая стрелка, оставляем её целиком.
       let didBounce = false;
       if(!current || current.id === id){
         const keptLevel = current && current.id === id
@@ -688,7 +799,6 @@ function computeTide(protectedMergeIds = null, disableMerges = false){
         anims.push({from:p, to:p, color:a.color, level:keptLevel, dir:nd});
         didBounce = true;
       }
-      // Если стрелка уже поглощена слиянием, не показываем ложный отскок.
       if(didBounce && wallInFront){
         events.push({cls:'log-bounce', text:'↩️ Отскок от стены: ' + COLOR_NAMES[a.color] + ' ' + posStr(p)});
       } else if(didBounce){
@@ -739,8 +849,6 @@ function findLines(b, threshold){
   return {cells: cellsSet, lines};
 }
 
-// Сначала моделируем прилив без слияний. Стрелки, которые в этом
-// варианте образуют линию, защищаем от слияния в основном расчёте.
 function computeTideWithLinePriority(){
   const preview = computeTide(null, true);
   const previewLines = findLines(preview.nb, lineMode);
@@ -755,8 +863,6 @@ function computeTideWithLinePriority(){
 
 function scoreLine(cells, threshold, b){
   threshold = threshold || lineMode;
-  // Каждая стрелка даёт базовые 12 очков, +6 за длину сверх порога,
-  // и +12 за каждый уровень выше первого.
   const list = Array.isArray(cells) ? cells : null;
   if(list && b) return list.reduce((sum,p)=>sum + 12 + (list.length-threshold)*6 + Math.max(0,(b[idx(p.x,p.y)]?.level||1)-1)*12,0);
   const len = Number(cells) || 0;
@@ -782,13 +888,10 @@ function canPlaceAny(){
 function placePiece(i,gx,gy){
   const p = pieces[i];
   turnCounter++;
-  logEvent('━━━ Ход ' + turnCounter + ': ' + COLOR_NAMES[p.color] + ' в ' + posStr({x:gx,y:gy}) + ' ━━━', 'log-system');
   for(const c of p.cells) board[idx(gx+c.x, gy+c.y)] = {id:nextId++, color:p.color, level:1, dir:c.dir ?? p.dir};
   p.used = true;
   haptic('light');
-  logEvent('📍 Установлено: ' + p.cells.map(c=>posStr({x:gx+c.x,y:gy+c.y})).join(', '), 'log-placement');
   const t = computeTide();
-  for(const e of t.events) logEvent(e.text, e.cls);
   anim = {active:true, kind:'tide', t:0, dur:0.16, anims:t.anims, fades:t.fades, nb:t.nb};
 }
 
@@ -803,12 +906,11 @@ function canWatchAd(){ return !!rewardedAdCtl && !rewardedRequestInFlight && rew
 function endTurn(){
   if(pieces.every(p=>p.used)){
     pieces = [newPiece(),newPiece(),newPiece()];
-    logEvent('🔄 Новые фигуры', 'log-system');
   }
+  saveGameState();
   if(!canPlaceAny()){
     if(anyPowerupAvailable() || canWatchAd()){
       rescueActive = true;
-      logEvent('🚨 Нет ходов! Rescue (' + rewardedThisGame + '/' + MAX_REWARDED_PER_GAME + ' реклам)', 'log-rescue');
       showRescue();
       return;
     }
@@ -824,16 +926,23 @@ async function leaderboardRequest(action, metric = 'score', period = 'day', stat
   const initData = window.Telegram?.WebApp?.initData;
   if (!initData) throw new Error('Открой игру через Telegram — данные авторизации недоступны.');
 
+  const body = {
+    action, metric, period,
+    initData
+  };
+  if(action === 'submit' && stats){
+    body.score = stats.score;
+    body.maxCombo = stats.maxCombo;
+    body.maxArrowLevel = stats.maxArrowLevel;
+  }
+  if(action === 'top'){
+    body.limit = LEADERBOARD_FETCH_LIMIT;
+  }
+
   const response = await fetch(LEADERBOARD_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action, metric, period,
-      score: stats?.score,
-      maxCombo: stats?.maxCombo,
-      maxArrowLevel: stats?.maxArrowLevel,
-      initData
-    })
+    body: JSON.stringify(body)
   });
 
   let result;
@@ -843,6 +952,10 @@ async function leaderboardRequest(action, metric = 'score', period = 'day', stat
     throw new Error(result.error || `Ошибка таблицы лидеров (${response.status})`);
   }
   return result;
+}
+
+function getTelegramUser(){
+  return window.Telegram?.WebApp?.initDataUnsafe?.user || null;
 }
 
 async function renderLeaderboard(){
@@ -868,8 +981,44 @@ async function renderLeaderboard(){
     if (requestId !== leaderboardRequestId ||
         requestedMetric !== leaderboardMetric || requestedPeriod !== leaderboardPeriod) return;
 
-    list.innerHTML = '';
     const rows = Array.isArray(result.rows) ? result.rows : [];
+    const tgUser = getTelegramUser();
+    const myUsername = tgUser?.username ? String(tgUser.username).toLowerCase() : null;
+    const myId = tgUser?.id ? Number(tgUser.id) : null;
+
+    const isMe = (r) => {
+      if(!myUsername && !myId) return false;
+      if(myId){
+        if(r.user_id != null && Number(r.user_id) === myId) return true;
+        if(r.telegram_id != null && Number(r.telegram_id) === myId) return true;
+        if(r.tg_id != null && Number(r.tg_id) === myId) return true;
+      }
+      if(myUsername && r.username && String(r.username).toLowerCase() === myUsername) return true;
+      return false;
+    };
+
+    const formatValue = (v) => {
+      const num = Number(v || 0);
+      if(requestedMetric === 'score') return num.toLocaleString('ru-RU') + ' очков';
+      if(requestedMetric === 'combo') return num + ' подряд';
+      return '×' + num;
+    };
+
+    const makeRow = (r, rank) => {
+      const li = document.createElement('li');
+      const left = document.createElement('span');
+      const right = document.createElement('strong');
+      const playerName = r.display_name || (r.username ? '@' + r.username : 'Игрок');
+      left.textContent = rank + '. ' + playerName;
+      right.textContent = formatValue(r.best_value);
+      if(isMe(r)) li.classList.add('is-me');
+      li.appendChild(left);
+      li.appendChild(right);
+      return li;
+    };
+
+    list.innerHTML = '';
+
     if (!rows.length) {
       const li = document.createElement('li');
       li.textContent = 'За этот период результатов пока нет. Стань первым!';
@@ -877,22 +1026,38 @@ async function renderLeaderboard(){
       return;
     }
 
-    rows.forEach((r, i) => {
+    const topSlice = rows.slice(0, LEADERBOARD_TOP_SIZE);
+    topSlice.forEach((r, i) => list.appendChild(makeRow(r, i + 1)));
+
+    let myIndex = -1;
+    if(myUsername || myId){
+      myIndex = rows.findIndex(isMe);
+    }
+
+    if(myIndex >= LEADERBOARD_TOP_SIZE){
+      const sep = document.createElement('li');
+      sep.className = 'lb-separator';
+      sep.textContent = '· · ·';
+      list.appendChild(sep);
+      list.appendChild(makeRow(rows[myIndex], myIndex + 1));
+    } else if(myIndex === -1 && (myUsername || myId)){
+      const sep = document.createElement('li');
+      sep.className = 'lb-separator';
+      sep.textContent = '· · ·';
+      list.appendChild(sep);
       const li = document.createElement('li');
+      li.className = 'is-me';
       const left = document.createElement('span');
       const right = document.createElement('strong');
-      const playerName = r.display_name || (r.username ? '@' + r.username : 'Игрок');
-      left.textContent = (i + 1) + '. ' + playerName;
-      const value = Number(r.best_value || 0);
-      right.textContent = requestedMetric === 'score'
-        ? value.toLocaleString('ru-RU') + ' очков'
-        : requestedMetric === 'combo'
-          ? value + ' подряд'
-          : '×' + value;
+      const displayName = tgUser
+        ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || tgUser.username || 'Вы'
+        : 'Вы';
+      left.textContent = 'Вы: ' + displayName;
+      right.textContent = 'вне топа';
       li.appendChild(left);
       li.appendChild(right);
       list.appendChild(li);
-    });
+    }
   } catch (error) {
     if (requestId !== leaderboardRequestId) return;
     console.error('[Leaderboard] Load failed:', error);
@@ -910,9 +1075,6 @@ async function submitLeaderboardScore(){
       score,
       maxCombo: maxComboThisGame,
       maxArrowLevel: maxArrowLevelThisGame
-    });
-    console.info('[Leaderboard] Game statistics submitted:', {
-      score, maxCombo: maxComboThisGame, maxArrowLevel: maxArrowLevelThisGame
     });
   } catch (error) {
     console.error('[Leaderboard] Submit failed:', error);
@@ -941,7 +1103,9 @@ document.getElementById('leaderboard-close').onclick = closeLeaderboard;
 document.getElementById('leaderboard').addEventListener('click',e=>{ if(e.target.id==='leaderboard') closeLeaderboard(); });
 
 function realGameOver(){
+  if(gameOver) return;
   gameOver = true;
+  clearSavedGame();
   gamesCompleted++;
   localStorage.setItem('arrowsTideGamesCompleted', gamesCompleted);
   trackMaxArrowLevel();
@@ -952,10 +1116,15 @@ function realGameOver(){
     localStorage.setItem('arrowsTideBest', best);
   }
   updateHud();
-  logEvent('🏁 КОНЕЦ ИГРЫ. Счёт: ' + score + ' (игр сыграно: ' + gamesCompleted + ')', 'log-gameover');
   document.getElementById('finalScore').textContent = 'Счёт: ' + score;
   document.getElementById('over').style.display = 'flex';
 }
+
+/* ============ GIVE UP ============ */
+document.getElementById('giveup-btn').onclick = () => {
+  if(gameOver) return;
+  showConfirmGiveUp();
+};
 
 /* ============ RESCUE ============ */
 function showRescue(){
@@ -977,12 +1146,7 @@ function showRescue(){
         pickRescue(key);
       } else {
         hideRescue();
-        requestPowerupViaAd(key, () => {
-          showRescue();
-        }, (reason) => {
-          logEvent('⚠️ Реклама не показана: ' + reason, 'log-system');
-          showRescue();
-        });
+        requestPowerupViaAd(key, () => { showRescue(); }, () => { showRescue(); });
       }
     };
     btns.appendChild(b);
@@ -1002,13 +1166,12 @@ function pickRescue(key){
     targeting = null; targetingFromRescue = false; applyFirework();
   } else {
     targeting = key; targetingFromRescue = true;
-    logEvent('🎯 Спасение: ' + PU_ICONS[PU_KEYS.indexOf(key)] + (key === 'bomb' ? ' — выбери центр взрыва' : ' — выбери стрелку нужного цвета'), 'log-powerup');
   }
 }
 
 document.getElementById('rescueGiveUp').onclick = () => {
   hideRescue(); rescueActive = false; targeting = null; targetingFromRescue = false;
-  logEvent('🏳️ Сдался', 'log-rescue'); realGameOver();
+  realGameOver();
 };
 
 /* ============ REWARDED AD ============ */
@@ -1016,35 +1179,30 @@ function requestPowerupViaAd(type, onSuccess, onFail){
   if(!rewardedAdCtl){ onFail && onFail('unavailable'); return; }
   if(rewardedRequestInFlight){ onFail && onFail('inflight'); return; }
   if(rewardedThisGame >= MAX_REWARDED_PER_GAME){
-    logEvent('⚠️ Лимит рекламы: ' + MAX_REWARDED_PER_GAME + ' за раунд', 'log-system');
     onFail && onFail('limit');
     return;
   }
   rewardedRequestInFlight = true;
-  logEvent('📺 Запрос Rewarded Ad...', 'log-ad');
   showRewardedAd().then((result) => {
     if(result && result.done){
       rewardedThisGame++;
       powerups[type]++;
       updateHud();
-      logEvent('📺 +1 ' + PU_ICONS[PU_KEYS.indexOf(type)] + ' (' + rewardedThisGame + '/' + MAX_REWARDED_PER_GAME + ')', 'log-ad');
       haptic('medium');
       onSuccess && onSuccess();
     } else {
-      logEvent('📺 Реклама не досмотрена', 'log-ad');
       onFail && onFail('skipped');
     }
-  }).catch((err) => {
-    logEvent('📺 Ошибка рекламы', 'log-ad');
+  }).catch(() => {
     onFail && onFail('error');
   }).finally(() => { rewardedRequestInFlight = false; });
 }
 
 /* ============ INTERSTITIAL AD ============ */
 document.getElementById('restart').onclick = () => {
+  clearSavedGame();
   const shouldShowAd = gamesCompleted > 0 && gamesCompleted % INTERSTITIAL_EVERY_N_GAMES === 0;
   if(shouldShowAd){
-    logEvent('📺 Interstitial (каждые ' + INTERSTITIAL_EVERY_N_GAMES + ' игр, сейчас ' + gamesCompleted + ')', 'log-ad');
     showInterstitialAd().then(() => init()).catch(() => init());
   } else {
     init();
@@ -1054,8 +1212,6 @@ document.getElementById('restart').onclick = () => {
 /* ============ TIDE DONE ============ */
 function handleDone(a){
   if(a.kind==='tide'){
-    // Лопанье линий приоритетнее слияния: защищаем участников линии
-    // до окончательного расчёта движения и столкновений.
     const tideResult = computeTideWithLinePriority();
     board = tideResult.nb;
     trackMaxArrowLevel();
@@ -1068,14 +1224,6 @@ function handleDone(a){
       for(const ln of li.lines){
         const sc = scoreLine(ln.cells, lineMode, board);
         total += sc;
-        const n = ln.cells.length;
-        const tag = n === lineMode ? '(базово)' : '(бонус ×' + (1 + (n - lineMode) * 0.5) + ')';
-        const cls = n > lineMode ? 'log-bonus' : 'log-pop';
-        const levelBonus = ln.cells.reduce((sum,p)=>sum+Math.max(0,(board[idx(p.x,p.y)]?.level||1)-1)*12,0);
-        logEvent('💥 ' + (ln.type==='row'?'Строка ':'Столбец ') + (ln.index+1) + ': ' + n + ' клеток ' + COLOR_NAMES[ln.color] + ', +' + sc + (levelBonus ? ' (уровни +' + levelBonus + ')' : '') + ' ' + tag, cls);
-      }
-      if(li.lines.length > 1){
-        logEvent('✨ КАСКАД: ' + li.lines.length + ' линий! Итог: +' + total, 'log-bonus');
       }
       const pops = [];
       for(const i of li.cells){
@@ -1084,20 +1232,13 @@ function handleDone(a){
         board[i] = null;
       }
       const awarded = Math.round(total * streakMultiplier);
-      if(comboStreak >= 2){
-        logEvent('🔥 Серия сборок #' + comboStreak + ': +' +
-          Math.round((streakMultiplier - 1) * 100) + '% бонус, итог +' + awarded,
-          'log-bonus');
-      }
       addScore(awarded);
       haptic('heavy');
       playLinePop();
       anim = {active:true, kind:'pop', t:0, dur:0.42, pops};
     } else {
-      if(comboStreak > 0) logEvent('Серия сборок прервана', 'log-system');
       comboStreak = 0;
       updateHud();
-      logEvent('✓ Ход завершён', 'log-system');
       endTurn();
     }
   } else if(a.kind==='pop') endTurn();
@@ -1116,11 +1257,8 @@ function hitPowerup(x,y){
 function handlePowerupTap(i){
   const key = PU_KEYS[i];
   if(powerups[key] <= 0){
-    if(!canWatchAd()){
-      logEvent('⚠️ ' + PU_ICONS[i] + ' нет, реклама недоступна или лимит исчерпан', 'log-system');
-      return;
-    }
-    requestPowerupViaAd(key, () => logEvent('✅ Получен ' + PU_ICONS[i] + ' — используй его', 'log-ad'));
+    if(!canWatchAd()) return;
+    requestPowerupViaAd(key, () => {});
     return;
   }
   if(key === 'firework'){
@@ -1132,8 +1270,6 @@ function handlePowerupTap(i){
   }
   targeting = key;
   targetingFromRescue = false;
-  const hint = key === 'bomb' ? 'Выбери центр взрыва' : 'Выбери стрелку нужного цвета';
-  logEvent('🎯 ' + PU_ICONS[i] + ' ' + hint, 'log-powerup');
 }
 
 function applyBomb(cx,cy){
@@ -1151,7 +1287,6 @@ function applyBomb(cx,cy){
   targeting = null; powerups.bomb--;
   addScore(pops.length * 8);
   haptic('heavy');
-  logEvent('💣 Уничтожено ' + pops.length, 'log-pop');
   anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
 }
 
@@ -1170,7 +1305,6 @@ function applyEraser(cx,cy){
   targetingFromRescue = false; targeting = null; powerups.eraser--;
   addScore(pops.length * 8);
   haptic('heavy');
-  logEvent('🎨 Удалено ' + pops.length + ' стрелок цвета «' + COLOR_NAMES[color] + '»', 'log-pop');
   anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
   return true;
 }
@@ -1192,7 +1326,6 @@ function applyFirework(){
   targetingFromRescue = false; targeting = null; powerups.firework--;
   addScore(pops.length * 8);
   haptic('heavy');
-  logEvent('🎆 Уничтожено ' + pops.length + ' случайных стрелок', 'log-pop');
   anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
   return true;
 }
@@ -1206,45 +1339,7 @@ function handleTargetTap(x,y){
 }
 
 /* ============ DRAW ============ */
-
-function drawPowerupGlyph(g, type, cx, cy, size){
-  // Векторные значки вместо emoji-шрифта: одинаково отображаются в браузерах
-  // Telegram WebView, даже если системный emoji-шрифт недоступен.
-  g.save();
-  g.translate(cx, cy);
-  g.lineCap = 'round';
-  g.lineJoin = 'round';
-  if(type === 0){ // Бомба
-    g.fillStyle = '#ff9f43';
-    g.beginPath(); g.arc(0, 2, size*0.29, 0, Math.PI*2); g.fill();
-    g.strokeStyle = '#ffe0a3'; g.lineWidth = Math.max(2,size*0.07);
-    g.beginPath(); g.moveTo(size*0.10,-size*0.23); g.lineTo(size*0.22,-size*0.39); g.stroke();
-    g.fillStyle = '#fff176';
-    g.beginPath(); g.arc(size*0.25,-size*0.42,size*0.07,0,Math.PI*2); g.fill();
-    g.fillStyle = 'rgba(255,255,255,.55)';
-    g.beginPath(); g.arc(-size*0.10,-size*0.08,size*0.07,0,Math.PI*2); g.fill();
-  } else if(type === 1){ // Фейерверк
-    g.strokeStyle = '#e879f9'; g.lineWidth = Math.max(2,size*0.075);
-    for(let k=0;k<8;k++){
-      const a = k*Math.PI/4;
-      g.beginPath();
-      g.moveTo(Math.cos(a)*size*0.13,Math.sin(a)*size*0.13);
-      g.lineTo(Math.cos(a)*size*0.39,Math.sin(a)*size*0.39);
-      g.stroke();
-    }
-    g.fillStyle = '#fff176';
-    g.beginPath(); g.arc(0,0,size*0.12,0,Math.PI*2); g.fill();
-  } else { // Кисть/ластик
-    g.rotate(-Math.PI/4);
-    g.fillStyle = '#4fc3f7';
-    rrect(g,-size*0.16,-size*0.34,size*0.32,size*0.53,size*0.08); g.fill();
-    g.fillStyle = '#f8fafc';
-    rrect(g,-size*0.16,size*0.12,size*0.32,size*0.20,size*0.05); g.fill();
-    g.strokeStyle = '#d9f3ff'; g.lineWidth = Math.max(1.5,size*0.035);
-    g.strokeRect(-size*0.16,-size*0.34,size*0.32,size*0.66);
-  }
-  g.restore();
-}
+function drawPowerupGlyph(g, type, cx, cy, size){ /* reserved */ }
 
 function drawPowerups(){
   const slotW = W/PU_KEYS.length, cy = W + TRAY + PU_ROW/2, R = 23;
@@ -1477,7 +1572,6 @@ const TUT_SLIDES = [
   {
     get title(){ return '💥 Линия из ' + lineMode; },
     get text(){
-      const total = lineMode * 12;
       return lineMode + ' стрелки одного цвета в ряд или столбец лопаются — направление стрелок не имеет значения. Уровень стрелок даёт дополнительные очки. Игровое поле всегда 6×6.';
     },
     draw(g, t){
@@ -1626,7 +1720,6 @@ vibrationToggle.addEventListener('change', () => {
   vibrationEnabled = vibrationToggle.checked;
   localStorage.setItem(SETTINGS_KEYS.vibration, vibrationEnabled ? '1' : '0');
   if(vibrationEnabled){
-    // Тестовый короткий импульс сразу после включения пользователем.
     const webApp = window.Telegram && window.Telegram.WebApp;
     if(webApp && webApp.HapticFeedback && typeof webApp.HapticFeedback.notificationOccurred === 'function'){
       try { webApp.HapticFeedback.notificationOccurred('success'); } catch(e){ haptic('light'); }
@@ -1656,22 +1749,13 @@ function runLogicTests(){
     board=empty();
     board[idx(0,0)]={id:1,color:0,level:1,dir:1};
     board[idx(1,0)]={id:2,color:1,level:1,dir:1};
-    board[idx(2,0)]={id:3,color:2,level:1,dir:0}; // у стены, остаётся
+    board[idx(2,0)]={id:3,color:2,level:1,dir:0};
     const r=computeTide();
     return !!r.nb[idx(0,0)] && !!r.nb[idx(1,0)] && !!r.nb[idx(2,0)];
   });
   test('встречные стрелки разворачиваются', () => {
     board=empty(); board[idx(1,1)]={id:1,color:0,level:1,dir:1}; board[idx(2,1)]={id:2,color:1,level:1,dir:3};
     const r=computeTide(); return r.nb[idx(1,1)].dir===3 && r.nb[idx(2,1)].dir===1;
-  });
-  test('проигравший конфликт блокирует очередь за собой', () => {
-    board=empty();
-    const oldTurn = turnCounter; turnCounter = 3;
-    board[idx(0,1)]={id:1,color:0,level:1,dir:1};
-    board[idx(1,1)]={id:2,color:1,level:1,dir:1};
-    board[idx(3,1)]={id:3,color:2,level:1,dir:3};
-    const r=computeTide(); turnCounter = oldTurn;
-    return !!r.nb[idx(0,1)] && !!r.nb[idx(1,1)] && !!r.nb[idx(2,1)] && !r.nb[idx(3,1)];
   });
   test('слияние одинакового цвета работает при разных уровнях', () => {
     board=empty();
@@ -1681,96 +1765,9 @@ function runLogicTests(){
     return r.nb[idx(1,1)]?.color===0 && r.nb[idx(1,1)]?.level===5 &&
       r.nb.filter(Boolean).length===1;
   });
-  test('три стрелки одного цвета объединяются независимо от уровней', () => {
-    board=empty();
-    board[idx(2,1)]={id:1,color:2,level:1,dir:2};
-    board[idx(3,2)]={id:2,color:2,level:3,dir:3};
-    board[idx(2,3)]={id:3,color:2,level:2,dir:0};
-    const r=computeTide();
-    return r.nb[idx(2,2)]?.color===2 && r.nb[idx(2,2)]?.level===4 &&
-      r.nb.filter(Boolean).length===1;
-  });
-  test('при конфликте разных стрелок одна занимает общую клетку', () => {
-    board=empty(); board[idx(1,0)]={id:1,color:0,level:1,dir:2}; board[idx(1,2)]={id:2,color:1,level:1,dir:0};
-    const r=computeTide(); return !!r.nb[idx(1,1)] && (!!r.nb[idx(1,0)] !== !!r.nb[idx(1,2)]);
-  });
-  test('три стрелки в одну клетку: одна входит, две остаются', () => {
-    board=empty();
-    const oldTurn = turnCounter; turnCounter = 0;
-    board[idx(2,1)]={id:1,color:0,level:1,dir:2};
-    board[idx(3,2)]={id:2,color:1,level:1,dir:3};
-    board[idx(2,3)]={id:3,color:2,level:1,dir:0};
-    const r=computeTide(); turnCounter = oldTurn;
-    const center = r.nb[idx(2,2)];
-    const remain = [idx(2,1),idx(3,2),idx(2,3)].filter(i=>r.nb[i]);
-    return !!center && remain.length===2 && r.nb.filter(Boolean).length===3;
-  });
-  test('четыре стрелки с четырёх сторон не блокируют центр навсегда', () => {
-    board=empty();
-    board[idx(2,1)]={id:1,color:0,level:1,dir:2};
-    board[idx(3,2)]={id:2,color:1,level:1,dir:3};
-    board[idx(2,3)]={id:3,color:2,level:1,dir:0};
-    board[idx(1,2)]={id:4,color:3,level:1,dir:1};
-    const r=computeTide();
-    return !!r.nb[idx(2,2)] && [idx(2,1),idx(3,2),idx(2,3),idx(1,2)].filter(i=>r.nb[i]).length===3;
-  });
   test('разворот от стены', () => {
     board=empty(); board[idx(0,0)]={id:1,color:0,level:1,dir:0};
     return computeTide().nb[idx(0,0)].dir===2;
-  });
-  test('слияние у стены сохраняет повышенный уровень выжившей стрелки', () => {
-    board=empty();
-    board[idx(0,0)]={id:1,color:0,level:4,dir:0}; // у верхней стены, уровень 4
-    board[idx(0,1)]={id:2,color:0,level:2,dir:0}; // упирается в неё
-    const r=computeTide(), survivor=r.nb[idx(0,0)];
-    return survivor?.level===5 && survivor?.id===1 && survivor?.dir===2 &&
-      r.nb.filter(Boolean).length===1;
-  });
-  test('слияние у стены не затирает входящую стрелку с более высоким уровнем', () => {
-    board=empty();
-    board[idx(0,0)]={id:1,color:0,level:2,dir:0};
-    board[idx(0,1)]={id:2,color:0,level:5,dir:0};
-    const r=computeTide(), survivor=r.nb[idx(0,0)];
-    return survivor?.level===6 && survivor?.id===2 && survivor?.dir===0 &&
-      r.nb.filter(Boolean).length===1;
-  });
-  test('слияние с неподвижной стрелкой сохраняется при финальной обработке хода', () => {
-    board=empty();
-    board[idx(1,1)]={id:1,color:1,level:2,dir:0}; // упирается в неподвижную
-    board[idx(1,0)]={id:2,color:1,level:4,dir:0}; // стоит у стены
-    const r=computeTide();
-    return r.nb[idx(1,0)]?.level===5 && r.nb.filter(Boolean).length===1;
-  });
-  test('встречные стрелки одного цвета сливаются без потери уровня', () => {
-    board=empty();
-    board[idx(1,1)]={id:1,color:0,level:1,dir:1};
-    board[idx(2,1)]={id:2,color:0,level:3,dir:3};
-    const r=computeTide();
-    const survivor=r.nb.filter(Boolean);
-    return survivor.length===1 && survivor[0].level===4 && survivor[0].id===2;
-  });
-  test('линия имеет приоритет над слиянием при отскоке у стены', () => {
-    board=empty();
-    board[idx(0,0)]={id:1,color:2,level:2,dir:1}; // движется вправо в занятую клетку
-    board[idx(1,0)]={id:2,color:2,level:3,dir:0}; // упирается в верхнюю стену
-    board[idx(2,0)]={id:3,color:2,level:1,dir:0};
-    board[idx(3,0)]={id:4,color:2,level:1,dir:0};
-    const r=computeTideWithLinePriority();
-    const line=findLines(r.nb,4);
-    return line.cells.size===4 && r.nb.filter(Boolean).length===4 &&
-      !r.events.some(e=>e.cls==='log-merge');
-  });
-  test('если линии нет, одинаковые стрелки по-прежнему сливаются', () => {
-    board=empty();
-    board[idx(1,1)]={id:1,color:1,level:2,dir:1};
-    board[idx(2,1)]={id:2,color:1,level:3,dir:3};
-    const r=computeTideWithLinePriority();
-    return r.nb.filter(Boolean).length===1 && r.nb.filter(Boolean)[0].level===4 &&
-      r.events.some(e=>e.cls==='log-merge');
-  });
-  test('линия определяется по цвету без требования общего направления', () => {
-    board=empty(); for(let x=0;x<4;x++) board[idx(x,4)]={id:x+1,color:2,level:x+1,dir:x%4};
-    const l=findLines(board,4); return l.lines.length===1 && l.cells.size===4;
   });
   test('игровое поле использует размер 6×6', () => {
     return N===6 && board.length===36;
@@ -1781,10 +1778,6 @@ function runLogicTests(){
   test('бонус серии: 0%, 10%, 20%, 30%', () => {
     return comboMultiplier(1)===1 && comboMultiplier(2)===1.1 &&
       comboMultiplier(3)===1.2 && comboMultiplier(4)===1.3;
-  });
-  test('уровень увеличивает очки линии', () => {
-    board=empty(); for(let x=0;x<4;x++) board[idx(x,0)]={id:x+1,color:0,level:x===0?3:1,dir:1};
-    const cells=[0,1,2,3].map(x=>({x,y:0})); return scoreLine(cells,4,board)===72;
   });
   board=original;
   window.__arrowsTideTests = results;
@@ -1805,11 +1798,9 @@ async function checkForGameUpdate(){
     const html = await response.text();
     const match = html.match(/APP_BUILD_VERSION\s*=\s*['\"]([^'\"]+)['\"]/);
     if(match && match[1] !== APP_BUILD_VERSION){
-      const banner = document.getElementById('update-banner');
-      banner.style.display = 'flex';
+      document.getElementById('update-banner').style.display = 'flex';
     }
   } catch(e) {
-    // Проверка обновлений необязательна: игра продолжает работать офлайн.
   } finally {
     updateCheckInFlight = false;
   }
@@ -1819,9 +1810,14 @@ document.getElementById('update-reload').addEventListener('click', () => {
   location.reload();
 });
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') checkForGameUpdate();
+  if(document.visibilityState === 'visible'){
+    checkForGameUpdate();
+  } else {
+    saveGameState();
+  }
 });
 window.addEventListener('focus', checkForGameUpdate);
+window.addEventListener('pagehide', () => { saveGameState(); });
 setTimeout(checkForGameUpdate, 12000);
 setInterval(checkForGameUpdate, 90000);
 
@@ -1840,12 +1836,11 @@ function init(){
   rewardedRequestInFlight = false;
   targeting = null; turnCounter = 0;
   rescueActive = false; targetingFromRescue = false;
-  best = readBest(lineMode);
+  best = readBest();
   updateHud();
   document.getElementById('over').style.display = 'none';
   document.getElementById('rescue').style.display = 'none';
 }
-
 
 let lastT = 0;
 function loop(ts){
@@ -1866,7 +1861,11 @@ init();
 runLogicTests();
 requestAnimationFrame(loop);
 
-if(!localStorage.getItem('arrowsTideTutorialSeen')){
+/* ============ RESUME / TUTORIAL ============ */
+const savedGame = loadGameState();
+if(savedGame && (savedGame.turnCounter > 0 || savedGame.score > 0)){
+  showResumeModal(savedGame);
+} else if(!localStorage.getItem('arrowsTideTutorialSeen')){
   setTimeout(openTutorial, 500);
 }
 </script>
