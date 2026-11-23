@@ -11,7 +11,9 @@
   html,body{margin:0;height:100%;background:#0b1020;color:#e8eefc;
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
-    touch-action:manipulation;overflow:hidden}
+    touch-action:none;overflow:hidden}
+  /* Keep Telegram's in-game surface from interpreting drags as page gestures. */
+  #app,#game{touch-action:none;overscroll-behavior:none}
   #update-banner{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;transform:translateX(-50%);
     z-index:200;display:none;align-items:center;gap:12px;padding:9px 12px 9px 14px;
     border:1px solid rgba(79,195,247,.55);border-radius:14px;background:#16213e;
@@ -148,6 +150,22 @@
     #tut-canvas{width:180px;height:180px}
     #tut-text{min-height:56px;font-size:13px}
   }
+
+  /* Visual themes: game logic and hit-testing remain unchanged. */
+  :root{--theme-bg:#0b1020;--theme-panel:#16213e;--theme-text:#e8eefc}
+  html[data-theme="pencil"],html[data-theme="pencil"] body{background:#e9dfc8;color:#302a22}
+  html[data-theme="pencil"] canvas{background-color:#f4ecd9;background-image:repeating-linear-gradient(0deg,rgba(80,65,45,.055) 0,rgba(80,65,45,.055) 1px,transparent 1px,transparent 5px);box-shadow:0 8px 25px rgba(50,35,20,.2)}
+  html[data-theme="clips"],html[data-theme="clips"] body{background:#d9e2e8;color:#26333c}
+  html[data-theme="clips"] canvas{background:linear-gradient(145deg,#f5f7f8,#cbd7df);box-shadow:0 8px 25px rgba(20,40,55,.22)}
+  html[data-theme="sticky"],html[data-theme="sticky"] body{background:#f3e8bd;color:#393322}
+  html[data-theme="sticky"] canvas{background:linear-gradient(145deg,#fff4bd,#f2d98b);box-shadow:0 8px 25px rgba(70,55,20,.2)}
+  html[data-theme="blueprint"],html[data-theme="blueprint"] body{background:#092b50;color:#e8f4ff}
+  html[data-theme="blueprint"] canvas{background-color:#0d3967;background-image:linear-gradient(rgba(210,235,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(210,235,255,.08) 1px,transparent 1px);background-size:20px 20px}
+  html[data-theme="pencil"] #settings-card,html[data-theme="clips"] #settings-card,html[data-theme="sticky"] #settings-card{background:#f8f0df;color:#302a22;border-color:rgba(50,40,25,.2)}
+  html[data-theme="blueprint"] #settings-card{background:#0d3967;color:#e8f4ff}
+  html[data-theme="pencil"] #settings-btn,html[data-theme="clips"] #settings-btn,html[data-theme="sticky"] #settings-btn{color:inherit}
+  #theme-select{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(127,127,127,.35);background:rgba(127,127,127,.12);color:inherit;font:inherit}
+
 </style>
 </head>
 <body>
@@ -207,6 +225,10 @@
     <h2 id="settings-title">⚙️ Настройки</h2>
     <label class="setting-row" for="sound-toggle"><span>🔊 Звуковые эффекты</span><input id="sound-toggle" type="checkbox"></label>
     <label class="setting-row" for="vibration-toggle"><span>📳 Вибрация</span><input id="vibration-toggle" type="checkbox"></label>
+    <div class="setting-row" style="display:block">
+      <label for="theme-select" style="display:block;margin-bottom:9px">🎨 Оформление игры</label>
+      <select id="theme-select"></select>
+    </div>
     <button id="settings-close" type="button">Готово</button>
   </div>
 </div>
@@ -253,15 +275,15 @@
 
 /* ============ КОНФИГ РЕКЛАМЫ ============ */
 const ADSGRAM_REWARDED_BLOCK = '61272';
-const ADSGRAM_INTERSTITIAL_BLOCK = 'int-61274';
+const ADSGRAM_INTERSTITIAL_BLOCK = '61274';
 const MAX_REWARDED_PER_GAME = 5;
-const INTERSTITIAL_EVERY_N_GAMES = 3;
+// Interstitial is shown at the natural break when the player taps «Ещё раз» after a completed game.
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
 const LEADERBOARD_FETCH_LIMIT = 1000;
 const LEADERBOARD_TOP_SIZE = 10;
-const APP_BUILD_VERSION = '2026-11-23.1';
+const APP_BUILD_VERSION = '2026-11-23.5';
 
 /* ============ SAVE GAME ============ */
 const SAVE_KEY = 'arrowsTideSavedGame';
@@ -273,10 +295,36 @@ if (window.Telegram && window.Telegram.WebApp) {
     window.Telegram.WebApp.ready();
     window.Telegram.WebApp.expand();
     window.Telegram.WebApp.setHeaderColor('#0b1020');
+    // Telegram Mini Apps API: prevent vertical swipe gestures from collapsing
+    // the Mini App while the player is dragging pieces.
+    if (typeof window.Telegram.WebApp.disableVerticalSwipes === 'function') {
+      window.Telegram.WebApp.disableVerticalSwipes();
+    }
   } catch(e){}
 }
 
 const SETTINGS_KEYS = { sound:'arrowsTideSoundEnabled', vibration:'arrowsTideVibrationEnabled' };
+
+// Администратор может включать/отключать темы здесь: enabled: true / false.
+// Пока все темы бесплатны; позже можно добавить unlockType: 'ad' без смены механики.
+const GAME_THEMES = [
+  { id:'classic', name:'🌌 Классика', enabled:true },
+  { id:'pencil', name:'✏️ Цветные карандаши', enabled:true },
+  { id:'clips', name:'📎 Paper Clips — скрепки', enabled:true },
+  { id:'sticky', name:'🗒️ Sticky Notes — стикеры', enabled:true },
+  { id:'blueprint', name:'📐 Чертёж — цветные ручки', enabled:true }
+];
+const THEME_STORAGE_KEY = 'arrowsTideTheme';
+let activeTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'classic';
+if(!GAME_THEMES.some(t => t.id === activeTheme && t.enabled)) activeTheme = 'classic';
+function applyTheme(id){
+  const theme = GAME_THEMES.find(t => t.id === id && t.enabled);
+  if(!theme) return;
+  activeTheme = id;
+  document.documentElement.dataset.theme = id;
+  localStorage.setItem(THEME_STORAGE_KEY, id);
+}
+
 function readSetting(key, fallback=true){
   const saved = localStorage.getItem(key);
   return saved === null ? fallback : saved === '1';
@@ -380,6 +428,12 @@ const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
 const PU_KEYS = ['bomb','firework','eraser'];
 const PU_ICONS = ['💣','🎆','🎨'];
 const PU_LABELS = ['Бомба','Фейерверк','Удалить цвет'];
+
+// Fallback for Telegram clients without disableVerticalSwipes().
+// Do not block gestures inside dialogs/settings; only protect the actual game area.
+document.getElementById('game').addEventListener('touchmove', e => {
+  if (e.target.closest('canvas')) e.preventDefault();
+}, { passive: false });
 
 const cvs = document.getElementById('c');
 const ctx = cvs.getContext('2d');
@@ -579,9 +633,28 @@ function drawArrowG(g, cx, cy, size, c, dir, level, alpha){
   g.translate(cx, cy);
   const r = size * 0.40, rad = r * 0.34;
   rrect(g, -r, -r, r*2, r*2, rad);
-  g.fillStyle = col(c, 0.18); g.fill();
-  g.lineWidth = Math.max(1.5, size * 0.045);
-  g.strokeStyle = col(c, 0.55); g.stroke();
+  const pencil = activeTheme === 'pencil';
+  const clips = activeTheme === 'clips';
+  const sticky = activeTheme === 'sticky';
+  const blueprint = activeTheme === 'blueprint';
+
+  // В тематических оформлениях цвет стрелки всегда остаётся главным
+  // визуальным сигналом: стилизуем материал, но не обесцвечиваем наконечник.
+  g.fillStyle = pencil ? col(c, 0.13) : clips ? 'rgba(255,255,255,.58)' :
+    sticky ? 'rgba(255,255,255,.48)' : blueprint ? col(c, 0.16) : col(c, 0.18);
+  g.fill();
+  g.lineWidth = Math.max(1.5, size * (pencil ? 0.032 : 0.045));
+  g.strokeStyle = pencil ? col(c, 0.95) : blueprint ? col(c, 0.98) :
+    col(c, clips ? 0.78 : sticky ? 0.85 : 0.55);
+  if(pencil) g.setLineDash([size*.045,size*.018]);
+  g.stroke();
+  if(pencil) g.setLineDash([]);
+
+  if(clips){
+    g.strokeStyle = 'rgba(80,100,115,.75)'; g.lineWidth = Math.max(1.5,size*.035);
+    g.beginPath(); g.arc(0,0,r*.72,Math.PI*.15,Math.PI*1.85); g.stroke();
+  }
+
   g.save();
   g.rotate(dir * Math.PI / 2);
   const a = size * 0.20;
@@ -589,7 +662,22 @@ function drawArrowG(g, cx, cy, size, c, dir, level, alpha){
   g.moveTo(0, -a*1.25); g.lineTo(a*0.95, a*0.85);
   g.lineTo(0, a*0.25); g.lineTo(-a*0.95, a*0.85);
   g.closePath();
-  g.fillStyle = col(c, 1); g.fill();
+
+  // И карандашные стрелки, и стрелки на чертеже — цветные.
+  // Контрастная обводка сохраняет читаемость на светлой и синей подложке.
+  g.fillStyle = col(c, 1);
+  g.fill();
+  if(pencil || blueprint){
+    g.strokeStyle = pencil ? 'rgba(48,40,32,.9)' : 'rgba(245,250,255,.95)';
+    g.lineWidth = Math.max(1.25,size*.035);
+    g.lineJoin = 'round';
+    g.stroke();
+
+    // Второй тонкий штрих создаёт эффект цветного карандаша/ручки.
+    g.strokeStyle = pencil ? col(c, .75) : col(c, .9);
+    g.lineWidth = Math.max(.7,size*.012);
+    g.stroke();
+  }
   g.restore();
   if(level > 1){
     g.fillStyle = col(c, 1);
@@ -1199,12 +1287,21 @@ function requestPowerupViaAd(type, onSuccess, onFail){
 }
 
 /* ============ INTERSTITIAL AD ============ */
-document.getElementById('restart').onclick = () => {
+let interstitialRequestInFlight = false;
+document.getElementById('restart').onclick = async () => {
+  // This button is available on the game-over screen: show the ad between games,
+  // never in the middle of a level. If the SDK/ad is unavailable, continue normally.
+  if(interstitialRequestInFlight) return;
+  interstitialRequestInFlight = true;
   clearSavedGame();
-  const shouldShowAd = gamesCompleted > 0 && gamesCompleted % INTERSTITIAL_EVERY_N_GAMES === 0;
-  if(shouldShowAd){
-    showInterstitialAd().then(() => init()).catch(() => init());
-  } else {
+  try {
+    if(gameOver && interstitialAdCtl) {
+      await showInterstitialAd();
+    }
+  } catch(e) {
+    console.warn('[AdsGram] interstitial display failed', e);
+  } finally {
+    interstitialRequestInFlight = false;
     init();
   }
 };
@@ -1702,9 +1799,19 @@ document.getElementById('help-btn').onclick = openTutorial;
 const settingsEl = document.getElementById('settings');
 const soundToggle = document.getElementById('sound-toggle');
 const vibrationToggle = document.getElementById('vibration-toggle');
+const themeSelect = document.getElementById('theme-select');
+GAME_THEMES.filter(t => t.enabled).forEach(t => {
+  const option = document.createElement('option');
+  option.value = t.id; option.textContent = t.name;
+  themeSelect.appendChild(option);
+});
+themeSelect.value = activeTheme;
+themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
+applyTheme(activeTheme);
 function openSettings(){
   soundToggle.checked = soundEnabled;
   vibrationToggle.checked = vibrationEnabled;
+  themeSelect.value = activeTheme;
   settingsEl.style.display = 'flex';
 }
 function closeSettings(){ settingsEl.style.display = 'none'; }
