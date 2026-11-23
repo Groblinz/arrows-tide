@@ -473,7 +473,7 @@ function readBest(){
 }
 let anim = { active: false };
 let drag = null, gameOver = false;
-let powerups = { bomb: 3, firework: 0, eraser: 3 };
+let powerups = { bomb: 1, firework: 1, eraser: 1 };
 let rewardedThisGame = 0;
 let rewardedRequestInFlight = false;
 let targeting = null;
@@ -556,7 +556,7 @@ function applyGameState(s){
   }));
   score = Number(s.score) || 0;
   nextId = Number(s.nextId) || 1;
-  powerups = s.powerups ? {...s.powerups} : {bomb:3, firework:0, eraser:3};
+  powerups = s.powerups ? {...s.powerups} : {bomb:1, firework:1, eraser:1};
   turnCounter = Number(s.turnCounter) || 0;
   comboStreak = Number(s.comboStreak) || 0;
   maxComboThisGame = Number(s.maxComboThisGame) || 0;
@@ -1879,8 +1879,8 @@ function runLogicTests(){
   test('игровое поле использует размер 6×6', () => {
     return N===6 && board.length===36;
   });
-  test('в начале партии по три каждого из трёх пауэрапoв', () => {
-    return PU_KEYS.length===3 && powerups.bomb===3 && powerups.firework===3 && powerups.eraser===3;
+  test('в начале партии по одному каждого из трёх пауэрапoв', () => {
+    return PU_KEYS.length===3 && powerups.bomb===1 && powerups.firework===1 && powerups.eraser===1;
   });
   test('бонус серии: 0%, 10%, 20%, 30%', () => {
     return comboMultiplier(1)===1 && comboMultiplier(2)===1.1 &&
@@ -1938,7 +1938,7 @@ function init(){
   maxComboThisGame = 0;
   maxArrowLevelThisGame = 1;
   anim = {active:false};
-  powerups = { bomb: 3, firework: 0, eraser: 3 };
+  powerups = { bomb: 1, firework: 1, eraser: 1 };
   rewardedThisGame = 0;
   rewardedRequestInFlight = false;
   targeting = null; turnCounter = 0;
