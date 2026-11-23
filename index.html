@@ -309,10 +309,10 @@ const SETTINGS_KEYS = { sound:'arrowsTideSoundEnabled', vibration:'arrowsTideVib
 // Пока все темы бесплатны; позже можно добавить unlockType: 'ad' без смены механики.
 const GAME_THEMES = [
   { id:'classic', name:'🌌 Классика', enabled:true },
-  { id:'pencil', name:'✏️ Цветные карандаши', enabled:true },
-  { id:'clips', name:'📎 Paper Clips — скрепки', enabled:true },
-  { id:'sticky', name:'🗒️ Sticky Notes — стикеры', enabled:true },
-  { id:'blueprint', name:'📐 Чертёж — цветные ручки', enabled:true }
+  { id:'pencil', name:'✏️ Цветные карандаши', enabled:false },
+  { id:'clips', name:'📎 Paper Clips — скрепки', enabled:false },
+  { id:'sticky', name:'🗒️ Sticky Notes — стикеры', enabled:false },
+  { id:'blueprint', name:'📐 Чертёж — цветные ручки', enabled:false }
 ];
 const THEME_STORAGE_KEY = 'arrowsTideTheme';
 let activeTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'classic';
