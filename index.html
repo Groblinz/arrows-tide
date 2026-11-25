@@ -308,7 +308,7 @@ const VIP_PLAYER_USERNAMES = [];    // например: ['some_user']
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
 const LEADERBOARD_FETCH_LIMIT = 1000;
 const LEADERBOARD_TOP_SIZE = 10;
-const APP_BUILD_VERSION = '2026-11-25.3';
+const APP_BUILD_VERSION = '2026-11-25.6';
 
 /* ============ SAVE GAME ============ */
 const SAVE_KEY = 'arrowsTideSavedGame';
@@ -555,15 +555,32 @@ function saveDaily(){
 function refreshDaily(){
   const today = currentDay();
   let d = dailyState || loadDaily();
-  if(d && d.day >= today){ dailyState = d; return false; }
+  if(d && d.day >= today){
+    if(!d.ads) d.ads = { bomb: 0, firework: 0, eraser: 0 };
+    dailyState = d; return false;
+  }
   const streak = (d && d.day === today - 1) ? d.streak + 1 : 1;   // пропуск дня = цепочка заново
-  dailyState = { day: today, streak };
+  dailyState = { day: today, streak, ads: { bomb: 0, firework: 0, eraser: 0 } };
   saveDaily();
   return true;
 }
 function startPowerups(){
   if(isVipPlayer()) return { bomb: POWERUP_CAP, firework: POWERUP_CAP, eraser: POWERUP_CAP };
-  return dailyGrants(dailyState.streak);   // каждая новая игра стартует с запасом по серии входов
+  return dailyAllotment();   // каждая новая игра стартует с дневным запасом
+}
+// Дневной стартовый запас = бонусы серии входов + пауэрапы, полученные за рекламу сегодня (до 4 каждого вида).
+function dailyAllotment(){
+  const g = dailyGrants(dailyState.streak), a = dailyState.ads || {}, r = {};
+  for(const k of PU_KEYS) r[k] = Math.min(POWERUP_CAP, g[k] + (a[k] || 0));
+  return r;
+}
+function persistAdBonus(type){
+  if(isVipPlayer()) return;
+  refreshDaily();   // на случай, если день сменился при открытом приложении
+  if(dailyAllotment()[type] >= POWERUP_CAP) return;
+  if(!dailyState.ads) dailyState.ads = { bomb: 0, firework: 0, eraser: 0 };
+  dailyState.ads[type]++;
+  saveDaily();
 }
 let _vip = null;
 function isVipPlayer(){
@@ -582,8 +599,8 @@ function consumePowerup(key){
 function powerupUsesLeft(){ return Math.max(0, POWERUP_USES_PER_GAME - powerupUses); }
 
 function dailyDialogText(){
-  const st = dailyState.streak, p = dailyGrants(st);
-  let text = 'День подряд: ' + st + '\n\nВ начале каждой игры у тебя: 💣 ×' + p.bomb + '  🎆 ×' + p.firework + '  🎨 ×' + p.eraser + '\nС таким запасом ты начинаешь каждую игру. Рекламой можно добирать до ' + POWERUP_CAP + ' каждого вида.\n\n';
+  const st = dailyState.streak, p = dailyAllotment();
+  let text = 'День подряд: ' + st + '\n\nВ начале каждой игры у тебя: 💣 ×' + p.bomb + '  🎆 ×' + p.firework + '  🎨 ×' + p.eraser + '\nС таким запасом ты начинаешь каждую игру. Пауэрапы за рекламу добавляются в него до конца дня (до ' + POWERUP_CAP + ' каждого вида).\n\n';
   if(st < 2) text += 'Зайди завтра — получишь 🎆 фейерверк.';
   else if(st < 4) text += 'Ещё ' + (4 - st) + ' дн. подряд — и добавится 🎨 краска.';
   else if(st < 7) text += 'Ещё ' + (7 - st) + ' дн. подряд — и +1 ко всем пауэрапам.';
@@ -692,7 +709,7 @@ function applyGameState(s){
     pieces = [newPiece(), newPiece(), newPiece()];
   }
   if(!canPlaceAny()){
-    if(anyPowerupAvailable() || canWatchAd()){
+    if(anyPowerupAvailable() || anyAdAvailable()){
       showRescue();
     }
   }
@@ -1105,6 +1122,13 @@ function addScore(pts){
 }
 
 function anyPowerupAvailable(){ return powerupUsesLeft() > 0 && PU_KEYS.some(k => powerups[k] > 0); }
+// Рекламу за пауэрап можно смотреть, только пока дневной запас этого вида меньше 4
+// (4 вида×3 = 12 — это и есть лимит применений за игру, больше смысла нет). VIP рекламу не получают.
+function adAllowed(type){
+  if(powerups[type] >= POWERUP_CAP || isVipPlayer()) return false;
+  return dailyAllotment()[type] < POWERUP_CAP;
+}
+function anyAdAvailable(){ return canWatchAd() && PU_KEYS.some(adAllowed); }
 function canWatchAd(){ return powerupUsesLeft() > 0 && !!rewardedAdCtl && !rewardedRequestInFlight && rewardedThisGame < MAX_REWARDED_PER_GAME; }
 
 function endTurn(){
@@ -1113,7 +1137,7 @@ function endTurn(){
   }
   saveGameState();
   if(!canPlaceAny()){
-    if(anyPowerupAvailable() || canWatchAd()){
+    if(anyPowerupAvailable() || anyAdAvailable()){
       rescueActive = true;
       showRescue();
       return;
@@ -1338,7 +1362,7 @@ function showRescue(){
   for(let i=0;i<PU_KEYS.length;i++){
     const key = PU_KEYS[i];
     const count = powerups[key];
-    const canWatchThis = count === 0 && canWatchAd();
+    const canWatchThis = count === 0 && canWatchAd() && adAllowed(key);
     if(count <= 0 && !canWatchThis) continue;
     const b = document.createElement('button');
     b.className = 'rescue-btn' + (count === 0 ? ' ad-btn' : '');
@@ -1387,12 +1411,13 @@ function requestPowerupViaAd(type, onSuccess, onFail){
     onFail && onFail('limit');
     return;
   }
-  if(powerups[type] >= POWERUP_CAP){ onFail && onFail('cap'); return; }
+  if(!adAllowed(type)){ onFail && onFail('cap'); return; }
   rewardedRequestInFlight = true;
   showRewardedAd().then((result) => {
     if(result && result.done){
       rewardedThisGame++;
       powerups[type] = Math.min(POWERUP_CAP, powerups[type] + 1);
+      persistAdBonus(type);   // остаётся в стартовом запасе до конца дня
       updateHud();
       haptic('medium');
       onSuccess && onSuccess();
@@ -1485,7 +1510,7 @@ function handlePowerupTap(i){
   const key = PU_KEYS[i];
   if(powerupUsesLeft() <= 0){ showFlash('Лимит: ' + POWERUP_USES_PER_GAME + ' пауэрапов за игру'); return; }
   if(powerups[key] <= 0){
-    if(!canWatchAd()) return;
+    if(!canWatchAd() || !adAllowed(key)) return;
     requestPowerupViaAd(key, () => {});
     return;
   }
@@ -1578,7 +1603,7 @@ function drawPowerups(){
   const limited = powerupUsesLeft() <= 0;
   for(let i=0;i<PU_KEYS.length;i++){
     const key=PU_KEYS[i], cx=slotW*(i+0.5), cnt=powerups[key];
-    const avail=cnt>0 && !limited, canAd=cnt===0 && canWatchAd(), canAdd=cnt>0 && cnt<POWERUP_CAP && canWatchAd(), isT=targeting===key;
+    const avail=cnt>0 && !limited, canAd=cnt===0 && canWatchAd() && adAllowed(key), canAdd=cnt>0 && canWatchAd() && adAllowed(key), isT=targeting===key;
     ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
     if(isT){ctx.fillStyle='rgba(79,195,247,.35)';ctx.strokeStyle='rgba(79,195,247,.95)';}
     else if(avail){ctx.fillStyle='rgba(255,255,255,.10)';ctx.strokeStyle='rgba(255,255,255,.25)';}
@@ -1702,7 +1727,7 @@ cvs.addEventListener('pointerdown', e=>{
     const ai = hitPowerupAd(pt.x, pt.y);
     if(ai >= 0){
       const k = PU_KEYS[ai];
-      if(powerups[k] > 0 && powerups[k] < POWERUP_CAP && canWatchAd()) requestPowerupViaAd(k, () => {});
+      if(powerups[k] > 0 && canWatchAd() && adAllowed(k)) requestPowerupViaAd(k, () => {});
       return;
     }
     const i = hitPowerup(pt.x, pt.y);
@@ -1898,7 +1923,7 @@ const TUT_SLIDES = [
       g.fillText('ход ' + (i + 1), x + 17, 166);
     }
   }},
-  { title: '🎁 Пауэрапы', text: '💣 бомба убирает стрелки в области 3×3; 🎆 фейерверк случайно удаляет до 9 стрелок; 🎨 краска убирает все стрелки выбранного цвета. Каждую игру ты начинаешь с 1 💣 (ежедневные входы добавляют другие). Рекламу можно смотреть в любой момент, пока пауэрапов меньше ' + POWERUP_CAP + ' каждого вида. За одну игру можно применить не более ' + POWERUP_USES_PER_GAME + '.', draw(g,t){
+  { title: '🎁 Пауэрапы', text: '💣 бомба убирает стрелки в области 3×3; 🎆 фейерверк случайно удаляет до 9 стрелок; 🎨 краска убирает все стрелки выбранного цвета. Каждую игру ты начинаешь с 1 💣 (ежедневные входы добавляют другие). Рекламу можно смотреть в любой момент, пока в дневном запасе меньше ' + POWERUP_CAP + ' пауэрапов этого вида (когда набрано по ' + POWERUP_CAP + ', реклама не предлагается): полученный за рекламу пауэрап остаётся в стартовом запасе каждой новой игры до конца дня. За одну игру можно применить не более ' + POWERUP_USES_PER_GAME + '.', draw(g,t){
     const pulse = 0.5 + 0.5 * Math.sin(t * 2);
     const icons = ['💣', '🎆', '🎨'];
     const clr = ['#ff9800', '#e879f9', '#4fc3f7'];
@@ -2147,6 +2172,15 @@ function runLogicTests(){
   });
   test('запас не превышает лимит и лимит применений = 12', () => {
     return POWERUP_CAP===4 && POWERUP_USES_PER_GAME===12 && Object.values(dailyGrants(99)).every(v => v<=POWERUP_CAP);
+  });
+  test('реклама добавляет в дневной стартовый запас (до лимита)', () => {
+    const bak = dailyState, bakDay = gameDayKey, bakVip = _vip;
+    dailyState = { day: 1, streak: 1, ads: { bomb: 1, firework: 0, eraser: 0 } }; gameDayKey = 1; _vip = false;
+    const ok1 = dailyAllotment().bomb === 2;
+    dailyState.ads.bomb = 9;
+    const ok2 = dailyAllotment().bomb === POWERUP_CAP;
+    dailyState = bak; gameDayKey = bakDay; _vip = bakVip;
+    return ok1 && ok2;
   });
   board=original;
   window.__arrowsTideTests = results;
