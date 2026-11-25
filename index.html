@@ -23,14 +23,15 @@
     overflow:hidden;justify-content:center;align-items:flex-start}
   #game{position:relative;flex:0 0 auto;width:min(520px,56vw);
     display:flex;flex-direction:column}
-  #hud{display:flex;justify-content:space-between;align-items:baseline;
-    padding:6px 6px 10px;font-variant-numeric:tabular-nums;gap:8px}
+  #hud{display:flex;justify-content:space-between;align-items:center;height:56px;
+    padding:0 6px;font-variant-numeric:tabular-nums;gap:8px}
+  #hud-left{display:flex;align-items:center;height:44px;min-width:0;flex:1 1 auto;white-space:nowrap}
   #score{font-size:34px;font-weight:800;letter-spacing:-.5px}
-  #combo{display:none;margin-left:7px;padding:4px 7px;border-radius:8px;
+  #combo{display:inline-block;visibility:hidden;line-height:1.2;margin-left:7px;padding:4px 7px;border-radius:8px;
     background:rgba(255,213,79,.14);color:#ffd54f;font-size:11px;font-weight:800;
     vertical-align:middle;white-space:nowrap}
   #best{font-size:14px;opacity:.65}
-  #hud-right{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
+  #hud-right{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex:0 0 auto}
   #help-btn{background:rgba(255,255,255,0.1);border:0;color:#e8eefc;
     padding:7px 10px;border-radius:9px;font-family:inherit;font-size:14px;
     font-weight:700;cursor:pointer}
@@ -138,6 +139,9 @@
   .btn-secondary{background:rgba(255,255,255,.1);color:#e8eefc}
   .btn-primary{background:linear-gradient(180deg,#4fc3f7,#2196f3);color:#04101f}
   .btn-danger{background:linear-gradient(180deg,#ff6b6b,#e53935);color:#fff}
+  #daily-text{white-space:pre-line;text-align:left}
+  #over #over-share{display:none;padding:11px 24px;font-size:15px;background:linear-gradient(180deg,#ffb74d,#fb8c00);color:#2a1500}
+  #over #over-shortcut{display:none;padding:9px 18px;font-size:14px;background:rgba(255,255,255,.1);color:#e8eefc}
 
   @media (min-width:901px) and (max-height:900px){
     #game{width:min(520px,56vw,calc((100vh - 80px) * 336 / 550))}
@@ -176,9 +180,8 @@
 <div id="app">
   <div id="game">
     <div id="hud">
-      <div><span id="score">0</span><span id="combo" aria-live="polite"></span></div>
+      <div id="hud-left"><span id="score">0</span><span id="combo" aria-live="polite"></span></div>
       <div id="hud-right">
-        <span id="best">рекорд: 0</span>
         <button id="leaderboard-btn" title="Таблица рекордов">🏆</button>
         <button id="help-btn" title="Туториал">?</button>
         <button id="giveup-btn" title="Сдаться" aria-label="Сдаться">🏳️</button>
@@ -196,6 +199,8 @@
       <h2>Игра окончена</h2>
       <p id="finalScore"></p>
       <button id="restart">Ещё раз</button>
+      <button id="over-share" type="button">📤 Поделиться результатом</button>
+      <button id="over-shortcut" type="button">📲 Добавить ярлык</button>
     </div>
   </div>
 </div>
@@ -229,6 +234,7 @@
       <label for="theme-select" style="display:block;margin-bottom:9px">🎨 Оформление игры</label>
       <select id="theme-select"></select>
     </div>
+    <div class="setting-row" id="shortcut-row" style="display:none"><span>📲 Ярлык на главном экране</span><button id="shortcut-btn" type="button" class="btn-secondary" style="border:0;border-radius:9px;padding:8px 12px;font:700 13px system-ui;cursor:pointer">Добавить</button></div>
     <button id="settings-close" type="button">Готово</button>
   </div>
 </div>
@@ -255,6 +261,14 @@
   </div>
 </div>
 
+<div id="daily-modal" class="dialog-overlay" role="dialog" aria-modal="true">
+  <div class="dialog-card">
+    <h2>🎁 Ежедневный вход</h2>
+    <p id="daily-text"></p>
+    <div class="dialog-buttons"><button id="daily-ok" class="btn-primary" type="button">Играть</button></div>
+  </div>
+</div>
+
 <div id="tutorial">
   <div id="tut-card">
     <div id="tut-step">1 / 9</div>
@@ -277,13 +291,24 @@
 const ADSGRAM_REWARDED_BLOCK = '61540';
 const ADSGRAM_INTERSTITIAL_BLOCK = 'int-61541';
 const MAX_REWARDED_PER_GAME = 6;
-// Interstitial is shown at the natural break when the player taps «Ещё раз» after a completed game.
+// Межстраничная реклама показывается не после каждой игры, а раз в N новых игр
+// (на кнопке «Ещё раз»). Меняй число здесь: 1 = каждый раз, 3 = каждая третья.
+const INTERSTITIAL_EVERY_N_GAMES = 3;
+const AD_COUNTER_KEY = 'arrowsTideNewGamesSinceAd';
+
+/* ============ ПАУЭРАПЫ: ЛИМИТЫ И VIP ============ */
+const POWERUP_CAP = 4;              // максимум каждого вида в запасе
+const POWERUP_USES_PER_GAME = 12;   // максимум применений за одну игру
+// Игроки, у которых в начале КАЖДОЙ игры по 4 пауэрапа каждого вида.
+// Telegram ID (числа) и/или username (без @, регистр не важен).
+const VIP_PLAYER_IDS = [];          // например: [123456789, 987654321]
+const VIP_PLAYER_USERNAMES = [];    // например: ['some_user']
 
 /* ============ SUPABASE LEADERBOARD ============ */
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
 const LEADERBOARD_FETCH_LIMIT = 1000;
 const LEADERBOARD_TOP_SIZE = 10;
-const APP_BUILD_VERSION = '2026-11-23.5';
+const APP_BUILD_VERSION = '2026-11-25.3';
 
 /* ============ SAVE GAME ============ */
 const SAVE_KEY = 'arrowsTideSavedGame';
@@ -492,6 +517,89 @@ function comboMultiplier(streak){
 }
 let rescueActive = false;
 let targetingFromRescue = false;
+let powerupUses = 0;
+let gameDayKey = 0;
+let flashMsg = null;
+function showFlash(text){ flashMsg = { text, until: performance.now() + 1800 }; }
+
+/* ============ ЕЖЕДНЕВНЫЙ ВХОД И ЗАПАС ПАУЭРАПОВ ============ */
+const DAILY_KEY = 'arrowsTideDaily';
+const DAY_MS = 86400000;
+// Смена дня (обновление запаса) происходит в 00:00 UTC.
+// Чтобы сдвинуть, поменяй смещение в миллисекундах (например, 3*3600*1000 для МСК).
+const DAY_RESET_OFFSET_MS = 0;
+function currentDay(){ return Math.floor((Date.now() + DAY_RESET_OFFSET_MS) / DAY_MS); }
+
+let dailyState = null;   // {day, streak, powerups}
+let dailyNew = false;    // сегодня первый вход?
+
+function dailyGrants(streak){
+  const g = { bomb: 1, firework: 0, eraser: 0 };       // старт дня: 1 бомба
+  if(streak >= 2) g.firework += 1;                     // 2+ дня подряд: +🎆
+  if(streak >= 4) g.eraser += 1;                       // 4+ дня подряд: +🎨
+  if(streak >= 7){ g.bomb += 1; g.firework += 1; g.eraser += 1; } // 7+ дней: +1 ко всем
+  for(const k of PU_KEYS) g[k] = Math.min(POWERUP_CAP, g[k]);
+  return g;
+}
+function loadDaily(){
+  try {
+    const d = JSON.parse(localStorage.getItem(DAILY_KEY) || 'null');
+    if(d && Number.isFinite(d.day) && Number.isFinite(d.streak)) return d;
+  } catch(e){}
+  return null;
+}
+function saveDaily(){
+  try { localStorage.setItem(DAILY_KEY, JSON.stringify(dailyState)); } catch(e){}
+}
+// Возвращает true, если наступил новый день (запас и серия обновлены).
+function refreshDaily(){
+  const today = currentDay();
+  let d = dailyState || loadDaily();
+  if(d && d.day >= today){ dailyState = d; return false; }
+  const streak = (d && d.day === today - 1) ? d.streak + 1 : 1;   // пропуск дня = цепочка заново
+  dailyState = { day: today, streak };
+  saveDaily();
+  return true;
+}
+function startPowerups(){
+  if(isVipPlayer()) return { bomb: POWERUP_CAP, firework: POWERUP_CAP, eraser: POWERUP_CAP };
+  return dailyGrants(dailyState.streak);   // каждая новая игра стартует с запасом по серии входов
+}
+let _vip = null;
+function isVipPlayer(){
+  if(_vip !== null) return _vip;
+  const u = getTelegramUser();
+  if(!u) return false;
+  const name = u.username ? String(u.username).toLowerCase() : '';
+  _vip = VIP_PLAYER_IDS.map(Number).includes(Number(u.id)) ||
+         VIP_PLAYER_USERNAMES.some(n => String(n).replace(/^@/,'').toLowerCase() === name && name);
+  return _vip;
+}
+function consumePowerup(key){
+  powerups[key]--;
+  powerupUses++;
+}
+function powerupUsesLeft(){ return Math.max(0, POWERUP_USES_PER_GAME - powerupUses); }
+
+function dailyDialogText(){
+  const st = dailyState.streak, p = dailyGrants(st);
+  let text = 'День подряд: ' + st + '\n\nВ начале каждой игры у тебя: 💣 ×' + p.bomb + '  🎆 ×' + p.firework + '  🎨 ×' + p.eraser + '\nС таким запасом ты начинаешь каждую игру. Рекламой можно добирать до ' + POWERUP_CAP + ' каждого вида.\n\n';
+  if(st < 2) text += 'Зайди завтра — получишь 🎆 фейерверк.';
+  else if(st < 4) text += 'Ещё ' + (4 - st) + ' дн. подряд — и добавится 🎨 краска.';
+  else if(st < 7) text += 'Ещё ' + (7 - st) + ' дн. подряд — и +1 ко всем пауэрапам.';
+  else text += 'Бонус +1 ко всем активен! Не пропускай дни, чтобы он остался.';
+  return text;
+}
+function showDailyDialog(onClose){
+  dailyNew = false;
+  const modal = document.getElementById('daily-modal');
+  document.getElementById('daily-text').textContent = dailyDialogText();
+  modal.style.display = 'flex';
+  document.getElementById('daily-ok').onclick = () => {
+    modal.style.display = 'none';
+    if(onClose) onClose();
+  };
+}
 
 /* ============ SAVE / LOAD ============ */
 function saveGameState(){
@@ -520,6 +628,8 @@ function saveGameState(){
       maxComboThisGame,
       maxArrowLevelThisGame,
       rewardedThisGame,
+      powerupUses,
+      dayKey: gameDayKey,
       savedAt: Date.now()
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
@@ -556,7 +666,13 @@ function applyGameState(s){
   }));
   score = Number(s.score) || 0;
   nextId = Number(s.nextId) || 1;
-  powerups = s.powerups ? {...s.powerups} : {bomb:1, firework:1, eraser:1};
+  const sp = s.powerups || {bomb:1};
+  powerups = {};
+  for(const k of PU_KEYS) powerups[k] = Math.max(0, Math.min(POWERUP_CAP, Number(sp[k]) || 0));
+  powerupUses = Number(s.powerupUses) || 0;
+  // Незавершённая игра продолжается со своими (старыми) пауэрапами,
+  // даже если сервер/день уже обновился. Новый запас — со следующей игры.
+  gameDayKey = Number.isFinite(s.dayKey) ? s.dayKey : Math.floor(((s.savedAt || Date.now()) + DAY_RESET_OFFSET_MS) / DAY_MS);
   turnCounter = Number(s.turnCounter) || 0;
   comboStreak = Number(s.comboStreak) || 0;
   maxComboThisGame = Number(s.maxComboThisGame) || 0;
@@ -988,8 +1104,8 @@ function addScore(pts){
   updateHud();
 }
 
-function anyPowerupAvailable(){ return PU_KEYS.some(k => powerups[k] > 0); }
-function canWatchAd(){ return !!rewardedAdCtl && !rewardedRequestInFlight && rewardedThisGame < MAX_REWARDED_PER_GAME; }
+function anyPowerupAvailable(){ return powerupUsesLeft() > 0 && PU_KEYS.some(k => powerups[k] > 0); }
+function canWatchAd(){ return powerupUsesLeft() > 0 && !!rewardedAdCtl && !rewardedRequestInFlight && rewardedThisGame < MAX_REWARDED_PER_GAME; }
 
 function endTurn(){
   if(pieces.every(p=>p.used)){
@@ -1216,6 +1332,7 @@ document.getElementById('giveup-btn').onclick = () => {
 
 /* ============ RESCUE ============ */
 function showRescue(){
+  if(powerupUsesLeft() <= 0){ realGameOver(); return; }
   const btns = document.getElementById('rescueBtns');
   btns.innerHTML = '';
   for(let i=0;i<PU_KEYS.length;i++){
@@ -1270,11 +1387,12 @@ function requestPowerupViaAd(type, onSuccess, onFail){
     onFail && onFail('limit');
     return;
   }
+  if(powerups[type] >= POWERUP_CAP){ onFail && onFail('cap'); return; }
   rewardedRequestInFlight = true;
   showRewardedAd().then((result) => {
     if(result && result.done){
       rewardedThisGame++;
-      powerups[type]++;
+      powerups[type] = Math.min(POWERUP_CAP, powerups[type] + 1);
       updateHud();
       haptic('medium');
       onSuccess && onSuccess();
@@ -1289,20 +1407,24 @@ function requestPowerupViaAd(type, onSuccess, onFail){
 /* ============ INTERSTITIAL AD ============ */
 let interstitialRequestInFlight = false;
 document.getElementById('restart').onclick = async () => {
-  // This button is available on the game-over screen: show the ad between games,
-  // never in the middle of a level. If the SDK/ad is unavailable, continue normally.
+  // Кнопка на экране окончания игры. Рекламу показываем раз в INTERSTITIAL_EVERY_N_GAMES
+  // новых игр, никогда посреди партии. Если реклама недоступна — просто начинаем игру.
   if(interstitialRequestInFlight) return;
   interstitialRequestInFlight = true;
   clearSavedGame();
   try {
-    if(gameOver && interstitialAdCtl) {
-      await showInterstitialAd();
+    let n = 0;
+    try { n = (Number(localStorage.getItem(AD_COUNTER_KEY)) || 0) + 1; localStorage.setItem(AD_COUNTER_KEY, String(n)); } catch(e){}
+    if(gameOver && interstitialAdCtl && n >= INTERSTITIAL_EVERY_N_GAMES) {
+      const r = await showInterstitialAd();
+      if(!(r && r.unavailable)){ try { localStorage.setItem(AD_COUNTER_KEY, '0'); } catch(e){} }
     }
   } catch(e) {
     console.warn('[AdsGram] interstitial display failed', e);
   } finally {
     interstitialRequestInFlight = false;
     init();
+    if(dailyNew) showDailyDialog();
   }
 };
 
@@ -1351,8 +1473,17 @@ function hitPowerup(x,y){
   return -1;
 }
 
+function hitPowerupAd(x,y){
+  const slotW = W/PU_KEYS.length, cy = W + TRAY + PU_ROW/2, R = 23;
+  for(let i=0;i<PU_KEYS.length;i++){
+    const bx = slotW*(i+0.5) + R*.78, by = cy + R*.78, dx = x-bx, dy = y-by;
+    if(dx*dx+dy*dy < 15*15) return i;
+  }
+  return -1;
+}
 function handlePowerupTap(i){
   const key = PU_KEYS[i];
+  if(powerupUsesLeft() <= 0){ showFlash('Лимит: ' + POWERUP_USES_PER_GAME + ' пауэрапов за игру'); return; }
   if(powerups[key] <= 0){
     if(!canWatchAd()) return;
     requestPowerupViaAd(key, () => {});
@@ -1381,7 +1512,7 @@ function applyBomb(cx,cy){
   }
   if(pops.length === 0) return;
   targetingFromRescue = false;
-  targeting = null; powerups.bomb--;
+  targeting = null; consumePowerup('bomb');
   addScore(pops.length * 8);
   haptic('heavy');
   anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
@@ -1399,7 +1530,7 @@ function applyEraser(cx,cy){
       board[i] = null;
     }
   }
-  targetingFromRescue = false; targeting = null; powerups.eraser--;
+  targetingFromRescue = false; targeting = null; consumePowerup('eraser');
   addScore(pops.length * 8);
   haptic('heavy');
   anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
@@ -1420,7 +1551,7 @@ function applyFirework(){
     pops.push({x:i%N, y:(i/N)|0, color:a.color, level:a.level, dir:a.dir});
     board[i] = null;
   }
-  targetingFromRescue = false; targeting = null; powerups.firework--;
+  targetingFromRescue = false; targeting = null; consumePowerup('firework');
   addScore(pops.length * 8);
   haptic('heavy');
   anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
@@ -1440,9 +1571,14 @@ function drawPowerupGlyph(g, type, cx, cy, size){ /* reserved */ }
 
 function drawPowerups(){
   const slotW = W/PU_KEYS.length, cy = W + TRAY + PU_ROW/2, R = 23;
+  ctx.save(); ctx.font = '11px system-ui'; ctx.textBaseline = 'top'; ctx.fillStyle = 'rgba(232,238,252,.6)';
+  ctx.textAlign = 'left'; ctx.fillText('Применено: ' + powerupUses + '/' + POWERUP_USES_PER_GAME, 8, W + TRAY + 6);
+  ctx.textAlign = 'right'; ctx.fillText('🔥 день ' + (dailyState ? dailyState.streak : 1) + (isVipPlayer() ? ' · VIP' : ''), W - 8, W + TRAY + 6);
+  ctx.restore();
+  const limited = powerupUsesLeft() <= 0;
   for(let i=0;i<PU_KEYS.length;i++){
     const key=PU_KEYS[i], cx=slotW*(i+0.5), cnt=powerups[key];
-    const avail=cnt>0, canAd=cnt===0 && canWatchAd(), isT=targeting===key;
+    const avail=cnt>0 && !limited, canAd=cnt===0 && canWatchAd(), canAdd=cnt>0 && cnt<POWERUP_CAP && canWatchAd(), isT=targeting===key;
     ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
     if(isT){ctx.fillStyle='rgba(79,195,247,.35)';ctx.strokeStyle='rgba(79,195,247,.95)';}
     else if(avail){ctx.fillStyle='rgba(255,255,255,.10)';ctx.strokeStyle='rgba(255,255,255,.25)';}
@@ -1453,6 +1589,10 @@ function drawPowerups(){
     ctx.font='bold 25px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle='#e8eefc';ctx.fillText(PU_ICONS[i],cx,cy+1);ctx.restore();
     ctx.font='10px system-ui';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle='rgba(232,238,252,.8)';ctx.fillText(PU_LABELS[i],cx,cy+R+3);
+    if(canAdd){
+      ctx.beginPath();ctx.arc(cx+R*.78,cy+R*.78,9,0,Math.PI*2);ctx.fillStyle='#ffd54f';ctx.fill();
+      ctx.fillStyle='#04101f';ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('+AD',cx+R*.78,cy+R*.78);
+    }
     if(cnt>0){
       ctx.beginPath();ctx.arc(cx+R*.78,cy-R*.78,9,0,Math.PI*2);ctx.fillStyle=isT?'#2196f3':'#ff6b6b';ctx.fill();
       ctx.fillStyle='#fff';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cnt,cx+R*.78,cy-R*.78);
@@ -1507,6 +1647,13 @@ function draw(){
     ctx.fillStyle='#04101f'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(text, W/2, 19);
   }
+  if(flashMsg && performance.now() < flashMsg.until){
+    ctx.font='bold 13px system-ui'; const fw = ctx.measureText(flashMsg.text).width + 24;
+    rrect(ctx, W/2-fw/2, 6, fw, 26, 13);
+    ctx.fillStyle='rgba(255,183,77,0.95)'; ctx.fill();
+    ctx.fillStyle='#04101f'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(flashMsg.text, W/2, 19);
+  }
   if(drag){
     const p = pieces[drag.i];
     const g = dragToGrid(drag);
@@ -1552,6 +1699,12 @@ cvs.addEventListener('pointerdown', e=>{
   if(e.pointerType !== 'mouse') e.preventDefault();
   const pt = getPos(e);
   if(pt.y > W + TRAY){
+    const ai = hitPowerupAd(pt.x, pt.y);
+    if(ai >= 0){
+      const k = PU_KEYS[ai];
+      if(powerups[k] > 0 && powerups[k] < POWERUP_CAP && canWatchAd()) requestPowerupViaAd(k, () => {});
+      return;
+    }
     const i = hitPowerup(pt.x, pt.y);
     if(i >= 0) handlePowerupTap(i);
     return;
@@ -1588,15 +1741,14 @@ cvs.addEventListener('pointercancel', ()=>{ drag = null; }, { passive: false });
 
 function updateHud(){
   document.getElementById('score').textContent = score;
-  document.getElementById('best').textContent = 'рекорд: ' + best;
   const comboEl = document.getElementById('combo');
   if(comboEl){
     if(comboStreak >= 2){
-      comboEl.style.display = 'inline-block';
+      comboEl.style.visibility = 'visible';
       comboEl.textContent = 'СЕРИЯ ×' + comboMultiplier(comboStreak).toFixed(1);
     } else {
-      comboEl.style.display = 'none';
-      comboEl.textContent = '';
+      comboEl.style.visibility = 'hidden';
+      comboEl.textContent = 'СЕРИЯ ×1.0';   // невидимый плейсхолдер: размер HUD не меняется
     }
   }
 }
@@ -1617,6 +1769,16 @@ const TUT_SLIDES = [
     drawArrowG(g, TUT_W/2+60, TUT_H/2, 44, COLORS[2], 2, 1);
     drawArrowG(g, TUT_W/2, TUT_H/2-60, 44, COLORS[3], 3, 1);
     drawArrowG(g, TUT_W/2, TUT_H/2+60, 44, COLORS[0], 2, 1);
+  }},
+  { title: '🤖 Первый вход — через бота', text: 'Чтобы прогресс сохранялся, первый вход в игру обязательно делай через бота в Telegram. Дальше можно запускать игру и через ярлык на главном экране.', draw(g,t){
+    const pulse = 1 + 0.06 * Math.sin(t * 4);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = Math.round(44 * pulse) + 'px system-ui'; g.fillStyle = '#fff';
+    g.fillText('🤖', 35, 90); g.fillText('🎮', 100, 90); g.fillText('💾', 165, 90);
+    g.font = 'bold 26px system-ui'; g.fillStyle = 'rgba(79,195,247,.9)';
+    g.fillText('→', 68, 90); g.fillText('→', 132, 90);
+    g.font = '12px system-ui'; g.fillStyle = 'rgba(255,255,255,.7)';
+    g.fillText('бот → игра → прогресс сохранён', TUT_W/2, 150);
   }},
   { title: '➡️ Прилив', text: 'После каждого хода все стрелки одновременно делают шаг в свою сторону.', draw(g,t){
     const c = t % 3;
@@ -1691,7 +1853,7 @@ const TUT_SLIDES = [
   },
   {
     get title(){ return '🌟 Бонус за длину'; },
-    get text(){ return 'Чем длиннее линия — тем больше очков за клетку. Охоться за длинными линиями и крестами!'; },
+    get text(){ return 'Каждая стрелка в линии даёт 12 очков, а за каждую клетку длиннее ' + lineMode + ' — ещё +6 за стрелку. Чем длиннее линия, тем больше очков. Охоться за длинными линиями и крестами!'; },
     draw(g, t){
       const pulse = 0.5 + 0.5 * Math.sin(t * 2);
       const cards = [];
@@ -1711,7 +1873,32 @@ const TUT_SLIDES = [
       }
     }
   },
-  { title: '🎁 Пауэрапы', text: 'В начале каждой новой игры есть по 3 использования: 💣 бомба уничтожает стрелки в области 3×3; 🎆 фейерверк случайно удаляет до 9 стрелок; 🎨 удаление цвета убирает с поля все стрелки выбранного цвета. Когда запас закончится, можно получить дополнительное использование за рекламу.', draw(g,t){
+  { title: '⭐ Уровень стрелок', text: 'Когда стрелки одного цвета сливаются, уровень растёт (цифра в углу). Каждая стрелка лопнувшей линии получает +12 очков за каждый уровень выше первого: стрелка 3 уровня даёт +24.', draw(g,t){
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2);
+    for(let i=0;i<3;i++){
+      const x = 35 + i * 65;
+      drawArrowG(g, x, 80, 52, COLORS[0], 1, i + 1);
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = 'bold 18px system-ui'; g.fillStyle = i ? 'rgba(224,64,251,' + (0.7 + 0.3*pulse) + ')' : 'rgba(255,152,0,.9)';
+      g.fillText('+' + (i * 12), x, 130);
+      g.font = '11px system-ui'; g.fillStyle = 'rgba(255,255,255,.6)';
+      g.fillText('ур. ' + (i + 1), x, 155);
+    }
+  }},
+  { title: '🔥 Серия', text: 'Если линии лопаются несколько ходов подряд — это серия. Со 2-го хода очки за линии умножаются: ×1.1, ×1.2, ×1.3… (+10% за каждый ход серии). Ход без линии обнуляет серию. Пауэрапы серию не меняют и дают по 8 очков за стрелку.', draw(g,t){
+    const active = Math.floor(t * 1.5) % 4;
+    for(let i=0;i<4;i++){
+      const h = 30 + i * 22, x = 22 + i * 44;
+      g.fillStyle = i <= active ? 'rgba(255,213,79,.9)' : 'rgba(255,213,79,.25)';
+      rrect(g, x, 150 - h, 34, h, 6); g.fill();
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = 'bold 13px system-ui'; g.fillStyle = '#e8eefc';
+      g.fillText('×' + (1 + i * 0.1).toFixed(1), x + 17, 150 - h - 12);
+      g.font = '10px system-ui'; g.fillStyle = 'rgba(255,255,255,.6)';
+      g.fillText('ход ' + (i + 1), x + 17, 166);
+    }
+  }},
+  { title: '🎁 Пауэрапы', text: '💣 бомба убирает стрелки в области 3×3; 🎆 фейерверк случайно удаляет до 9 стрелок; 🎨 краска убирает все стрелки выбранного цвета. Каждую игру ты начинаешь с 1 💣 (ежедневные входы добавляют другие). Рекламу можно смотреть в любой момент, пока пауэрапов меньше ' + POWERUP_CAP + ' каждого вида. За одну игру можно применить не более ' + POWERUP_USES_PER_GAME + '.', draw(g,t){
     const pulse = 0.5 + 0.5 * Math.sin(t * 2);
     const icons = ['💣', '🎆', '🎨'];
     const clr = ['#ff9800', '#e879f9', '#4fc3f7'];
@@ -1725,10 +1912,25 @@ const TUT_SLIDES = [
       g.beginPath(); g.arc(x + 13, TUT_H/2 - 13, 7, 0, Math.PI*2);
       g.fillStyle = '#ffd54f'; g.fill();
       g.font = 'bold 9px system-ui'; g.fillStyle = '#04101f';
-      g.fillText('3', x + 13, TUT_H/2 - 13);
+      g.fillText(String(POWERUP_CAP), x + 13, TUT_H/2 - 13);
     }
   }},
-  { title: '🚨 Спасение', text: 'Если ходов нет — используй накопленный пауэрап или получи один за доступный просмотр рекламы (макс. 5 за игру).', draw(g,t){
+  { title: '📅 Ежедневный вход', text: 'Заходи каждый день подряд. 2 дня — в начале каждой игры +1 🎆; 4 дня — ещё и +1 🎨; 7 дней — +1 ко всем пауэрапам. Бонусы действуют, пока ты не пропускаешь дни. Пропустил день — серия начинается заново. Запас каждого вида — не больше ' + POWERUP_CAP + '.', draw(g,t){
+    const n = (Math.floor(t * 1.2) % 7) + 1;
+    const icons = { 2:'🎆', 4:'🎨', 7:'🎁' };
+    for(let i=0;i<7;i++){
+      const x = 22 + i * 26, d = i + 1;
+      g.beginPath(); g.arc(x, 110, 11, 0, Math.PI*2);
+      g.fillStyle = d <= n ? 'rgba(79,195,247,.85)' : 'rgba(255,255,255,.08)'; g.fill();
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = 'bold 11px system-ui'; g.fillStyle = d <= n ? '#04101f' : 'rgba(255,255,255,.6)';
+      g.fillText(String(d), x, 110);
+      if(icons[d]){ g.font = '18px system-ui'; g.fillStyle = '#fff'; g.fillText(icons[d], x, 78); }
+    }
+    g.font = '11px system-ui'; g.fillStyle = 'rgba(255,255,255,.65)';
+    g.fillText('🎆 с 2-го дня · 🎨 с 4-го · 🎁 +1 ко всем с 7-го', TUT_W/2, 150);
+  }},
+  { title: '🚨 Спасение', text: 'Если ходов нет — используй пауэрап из запаса или (если его нет) получи один за просмотр рекламы (макс. ' + MAX_REWARDED_PER_GAME + ' за игру; не больше ' + POWERUP_CAP + ' каждого вида и ' + POWERUP_USES_PER_GAME + ' применений за игру).', draw(g,t){
     for(let y=0;y<4;y++) for(let x=0;x<4;x++){
       rrect(g, x*50+2, y*50+2, 46, 46, 8);
       g.fillStyle = 'rgba(255,255,255,0.05)'; g.fill();
@@ -1813,6 +2015,7 @@ function openSettings(){
   vibrationToggle.checked = vibrationEnabled;
   themeSelect.value = activeTheme;
   settingsEl.style.display = 'flex';
+  if(typeof refreshShortcutStatus === 'function') refreshShortcutStatus();
 }
 function closeSettings(){ settingsEl.style.display = 'none'; }
 document.getElementById('settings-btn').onclick = openSettings;
@@ -1837,6 +2040,54 @@ vibrationToggle.addEventListener('change', () => {
     try { navigator.vibrate(0); } catch(e){}
   }
 });
+/* ============ ПОДЕЛИТЬСЯ РЕЗУЛЬТАТОМ ============ */
+// Ссылка на твоего бота/мини-приложение. Пока в ней стоит REPLACE — кнопка скрыта.
+// Пример: 'https://t.me/my_arrows_bot' или 'https://t.me/my_arrows_bot/app'
+const BOT_SHARE_URL = 'https://t.me/Gamemaster2k26_bot';
+const overShare = document.getElementById('over-share');
+if(!BOT_SHARE_URL.includes('REPLACE')) overShare.style.display = 'inline-block';
+function buildShareText(){
+  const lines = ['🎯 Я набрал ' + score.toLocaleString('ru-RU') + ' очков в «Стрелки-Прилив»!'];
+  const extra = [];
+  if(maxComboThisGame >= 2) extra.push('🔥 серия ×' + comboMultiplier(maxComboThisGame).toFixed(1));
+  if(maxArrowLevelThisGame >= 2) extra.push('⚡ стрелка ур. ' + maxArrowLevelThisGame);
+  if(extra.length) lines.push(extra.join(' · '));
+  lines.push('Сможешь побить мой рекорд? 😏');
+  return lines.join('\n');
+}
+function shareResult(){
+  const text = buildShareText();
+  const link = 'https://t.me/share/url?url=' + encodeURIComponent(BOT_SHARE_URL) + '&text=' + encodeURIComponent(text);
+  const tg = window.Telegram && window.Telegram.WebApp;
+  try { if(tg && typeof tg.openTelegramLink === 'function'){ tg.openTelegramLink(link); return; } } catch(e){}
+  if(navigator.share){ navigator.share({ text, url: BOT_SHARE_URL }).catch(()=>{}); return; }
+  window.open(link, '_blank');
+}
+overShare.onclick = shareResult;
+
+/* ============ ЯРЛЫК НА ГЛАВНЫЙ ЭКРАН ============ */
+const tgApp = window.Telegram && window.Telegram.WebApp;
+const shortcutRow = document.getElementById('shortcut-row');
+const shortcutBtn = document.getElementById('shortcut-btn');
+const overShortcut = document.getElementById('over-shortcut');
+function updateShortcutUI(status){
+  const can = !!tgApp && typeof tgApp.addToHomeScreen === 'function' &&
+              status !== 'unsupported' && status !== 'added';
+  shortcutRow.style.display = can ? 'flex' : 'none';
+  overShortcut.style.display = can ? 'inline-block' : 'none';
+}
+function refreshShortcutStatus(){
+  if(!tgApp || typeof tgApp.addToHomeScreen !== 'function'){ updateShortcutUI('unsupported'); return; }
+  if(typeof tgApp.checkHomeScreenStatus === 'function'){
+    try { tgApp.checkHomeScreenStatus(updateShortcutUI); } catch(e){ updateShortcutUI('unknown'); }
+  } else updateShortcutUI('unknown');
+}
+function addShortcut(){ try { tgApp.addToHomeScreen(); } catch(e){ console.warn('[shortcut]', e); } }
+shortcutBtn.onclick = addShortcut;
+overShortcut.onclick = addShortcut;
+try { tgApp.onEvent('homeScreenAdded', () => updateShortcutUI('added')); } catch(e){}
+refreshShortcutStatus();
+
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && settingsEl.style.display === 'flex') closeSettings(); });
 document.addEventListener('keydown', e=>{
   if(document.getElementById('tutorial').style.display !== 'flex') return;
@@ -1880,11 +2131,22 @@ function runLogicTests(){
     return N===6 && board.length===36;
   });
   test('в начале партии по одному каждого из трёх пауэрапoв', () => {
-    return PU_KEYS.length===3 && powerups.bomb===1 && powerups.firework===1 && powerups.eraser===1;
+    return PU_KEYS.length===3 && PU_KEYS.every(k => powerups[k]>=0 && powerups[k]<=POWERUP_CAP) && powerups.bomb>=1;
   });
   test('бонус серии: 0%, 10%, 20%, 30%', () => {
     return comboMultiplier(1)===1 && comboMultiplier(2)===1.1 &&
       comboMultiplier(3)===1.2 && comboMultiplier(4)===1.3;
+  });
+  test('ежедневные бонусы: 1 / 2 / 4 / 7 дней подряд', () => {
+    const j = x => JSON.stringify(x);
+    return j(dailyGrants(1))===j({bomb:1,firework:0,eraser:0}) &&
+      j(dailyGrants(2))===j({bomb:1,firework:1,eraser:0}) &&
+      j(dailyGrants(4))===j({bomb:1,firework:1,eraser:1}) &&
+      j(dailyGrants(7))===j({bomb:2,firework:2,eraser:2}) &&
+      j(dailyGrants(30))===j({bomb:2,firework:2,eraser:2});
+  });
+  test('запас не превышает лимит и лимит применений = 12', () => {
+    return POWERUP_CAP===4 && POWERUP_USES_PER_GAME===12 && Object.values(dailyGrants(99)).every(v => v<=POWERUP_CAP);
   });
   board=original;
   window.__arrowsTideTests = results;
@@ -1938,7 +2200,10 @@ function init(){
   maxComboThisGame = 0;
   maxArrowLevelThisGame = 1;
   anim = {active:false};
-  powerups = { bomb: 1, firework: 1, eraser: 1 };
+  dailyNew = refreshDaily();
+  gameDayKey = dailyState.day;
+  powerups = startPowerups();
+  powerupUses = 0;
   rewardedThisGame = 0;
   rewardedRequestInFlight = false;
   targeting = null; turnCounter = 0;
@@ -1968,13 +2233,18 @@ init();
 runLogicTests();
 requestAnimationFrame(loop);
 
-/* ============ RESUME / TUTORIAL ============ */
-const savedGame = loadGameState();
-if(savedGame && (savedGame.turnCounter > 0 || savedGame.score > 0)){
-  showResumeModal(savedGame);
-} else if(!localStorage.getItem('arrowsTideTutorialSeen')){
-  setTimeout(openTutorial, 500);
+/* ============ DAILY / RESUME / TUTORIAL ============ */
+function continueStartup(){
+  const savedGame = loadGameState();
+  if(savedGame && (savedGame.turnCounter > 0 || savedGame.score > 0)){
+    showResumeModal(savedGame);
+  } else if(!localStorage.getItem('arrowsTideTutorialSeen')){
+    setTimeout(openTutorial, 500);
+  }
 }
+// Первый запуск: сначала туториал. Дальше — окно ежедневного бонуса, затем продолжение игры.
+if(dailyNew && localStorage.getItem('arrowsTideTutorialSeen')) showDailyDialog(continueStartup);
+else continueStartup();
 </script>
 </body>
 </html>
