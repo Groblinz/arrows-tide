@@ -25,10 +25,10 @@
     display:flex;flex-direction:column}
   #hud{display:flex;justify-content:space-between;align-items:center;height:56px;
     padding:0 6px;font-variant-numeric:tabular-nums;gap:8px}
-  #hud-left{display:flex;align-items:center;height:44px;min-width:0;flex:1 1 auto;white-space:nowrap}
-  #score{font-size:34px;font-weight:800;letter-spacing:-.5px}
-  #combo{display:inline-block;visibility:hidden;line-height:1.2;margin-left:7px;padding:4px 7px;border-radius:8px;
-    background:rgba(255,213,79,.14);color:#ffd54f;font-size:11px;font-weight:800;
+  #hud-left{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;height:56px;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden}
+  #score{font-size:32px;line-height:1.05;font-weight:800;letter-spacing:-.5px}
+  #combo{display:block;visibility:hidden;line-height:1.2;margin:3px 0 0 2px;padding:2px 8px;border-radius:8px;
+    background:rgba(255,213,79,.14);color:#ffd54f;font-size:10px;font-weight:800;
     vertical-align:middle;white-space:nowrap}
   #best{font-size:14px;opacity:.65}
   #hud-right{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex:0 0 auto}
@@ -308,7 +308,7 @@ const VIP_PLAYER_USERNAMES = [];    // например: ['some_user']
 const LEADERBOARD_API = 'https://xtrcjxljiiorlwgdlmtu.supabase.co/functions/v1/leaderboard';
 const LEADERBOARD_FETCH_LIMIT = 1000;
 const LEADERBOARD_TOP_SIZE = 10;
-const APP_BUILD_VERSION = '2026-11-25.6';
+const APP_BUILD_VERSION = '2026-11-25.9';
 
 /* ============ SAVE GAME ============ */
 const SAVE_KEY = 'arrowsTideSavedGame';
@@ -407,6 +407,60 @@ function playLinePop(){
     osc.connect(filter); sub.connect(filter); filter.connect(gain); gain.connect(popAudio.destination);
     osc.start(t); sub.start(t); osc.stop(t + 0.12); sub.stop(t + 0.20);
   } catch(e){}
+}
+/* ============ ЗВУКИ ПАУЭРАПОВ (синтез, без файлов) ============ */
+let noiseBuf = null;
+function sfxCtx(){
+  if(!soundEnabled) return null;
+  try { unlockGameAudio(); if(popAudio && popAudio.state === 'running') return popAudio; } catch(e){}
+  return null;
+}
+function sfxTone(c, t, f0, f1, dur, type, vol){
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t);
+  if(f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+function sfxNoise(c, t, dur, vol, f0, f1){
+  if(!noiseBuf){
+    const n = Math.floor(c.sampleRate * 0.6);
+    noiseBuf = c.createBuffer(1, n, c.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const s = c.createBufferSource(); s.buffer = noiseBuf;
+  const f = c.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  const g = c.createGain();
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(c.destination); s.start(t); s.stop(t + dur + 0.02);
+}
+function sfxBomb(){
+  const c = sfxCtx(); if(!c) return; const t = c.currentTime;
+  try { sfxTone(c, t, 150, 38, 0.5, 'sine', 0.5); sfxNoise(c, t, 0.42, 0.34, 2000, 180); sfxTone(c, t, 420, 90, 0.18, 'triangle', 0.12); } catch(e){}
+}
+function sfxRocketLaunch(){
+  const c = sfxCtx(); if(!c) return; const t = c.currentTime;
+  try { sfxTone(c, t, 280, 1200, 0.32, 'sawtooth', 0.05); sfxNoise(c, t, 0.32, 0.12, 3200, 700); } catch(e){}
+}
+function sfxSparkHit(pitch){
+  const c = sfxCtx(); if(!c) return; const t = c.currentTime;
+  try { sfxTone(c, t, 900 * pitch, 300 * pitch, 0.12, 'triangle', 0.11); sfxNoise(c, t, 0.08, 0.09, 5200, 1500); } catch(e){}
+}
+function sfxPaintSplash(){
+  const c = sfxCtx(); if(!c) return; const t = c.currentTime;
+  try { sfxTone(c, t, 220, 540, 0.15, 'sine', 0.2); sfxNoise(c, t, 0.13, 0.09, 1400, 400); } catch(e){}
+}
+function sfxPaintPop(progress){
+  const c = sfxCtx(); if(!c) return; const t = c.currentTime;
+  try { const f = 480 + progress * 560; sfxTone(c, t, f, f * 0.4, 0.09, 'triangle', 0.13); } catch(e){}
+}
+function sfxChime(){
+  const c = sfxCtx(); if(!c) return; const t = c.currentTime;
+  try { sfxTone(c, t, 880, 880, 0.4, 'sine', 0.11); sfxTone(c, t + 0.07, 1320, 1320, 0.4, 'sine', 0.09); } catch(e){}
 }
 document.addEventListener('pointerdown', unlockGameAudio, { once:true, passive:true });
 document.addEventListener('touchstart', () => { if(soundEnabled) unlockGameAudio(); }, { once:true, passive:true });
@@ -1167,17 +1221,32 @@ async function leaderboardRequest(action, metric = 'score', period = 'day', stat
     body.limit = LEADERBOARD_FETCH_LIMIT;
   }
 
-  const response = await fetch(LEADERBOARD_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  let response;
+  try {
+    response = await fetch(LEADERBOARD_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (_) {
+    const err = new Error('Нет соединения с сервером.');
+    err.retryable = true;   // сеть пропала — можно повторить позже
+    throw err;
+  }
 
   let result;
   try { result = await response.json(); }
-  catch (_) { throw new Error('Сервер вернул некорректный ответ.'); }
+  catch (_) {
+    const err = new Error('Сервер вернул некорректный ответ.');
+    err.retryable = true;
+    throw err;
+  }
   if (!response.ok || !result.success) {
-    throw new Error(result.error || `Ошибка таблицы лидеров (${response.status})`);
+    const err = new Error(result.error || `Ошибка таблицы лидеров (${response.status})`);
+    err.status = response.status;
+    // повторяем только временные сбои; отказ сервера (4xx) повторять бессмысленно
+    err.retryable = response.status >= 500 || response.status === 408 || response.status === 429;
+    throw err;
   }
   return result;
 }
@@ -1296,16 +1365,49 @@ async function renderLeaderboard(){
   }
 }
 
-async function submitLeaderboardScore(){
+/* Счета, которые не удалось отправить (нет сети, сбой сервера), ждут в очереди
+   и отправляются при следующем запуске, возврате в игру или появлении сети. */
+const PENDING_SCORES_KEY = 'arrowsTidePendingScores';
+const PENDING_SCORES_MAX = 10;
+const PENDING_SCORES_TTL_MS = 7 * 86400000;
+let flushingScores = false;
+function loadPendingScores(){
+  try { const a = JSON.parse(localStorage.getItem(PENDING_SCORES_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ return []; }
+}
+function savePendingScores(list){
+  try { localStorage.setItem(PENDING_SCORES_KEY, JSON.stringify(list.slice(-PENDING_SCORES_MAX))); } catch(e){}
+}
+async function flushPendingScores(){
+  if(flushingScores || !window.Telegram?.WebApp?.initData) return;
+  flushingScores = true;
   try {
-    trackMaxArrowLevel();
-    await leaderboardRequest('submit', 'score', 'day', {
-      score,
-      maxCombo: maxComboThisGame,
-      maxArrowLevel: maxArrowLevelThisGame
-    });
+    let list = loadPendingScores().filter(x => x && Date.now() - (x.ts || 0) < PENDING_SCORES_TTL_MS);
+    savePendingScores(list);
+    while(list.length){
+      try {
+        await leaderboardRequest('submit', 'score', 'day', list[0]);   // initData берётся свежий
+        list.shift(); savePendingScores(list);
+      } catch(e){
+        if(e.retryable) break;            // сети нет — попробуем позже
+        list.shift(); savePendingScores(list);   // сервер отказал: повтор не поможет
+      }
+    }
+  } finally { flushingScores = false; }
+}
+async function submitLeaderboardScore(){
+  trackMaxArrowLevel();
+  const stats = { score, maxCombo: maxComboThisGame, maxArrowLevel: maxArrowLevelThisGame };
+  try {
+    await leaderboardRequest('submit', 'score', 'day', stats);
+    flushPendingScores();   // сеть есть — заодно отправим то, что копилось
   } catch (error) {
     console.error('[Leaderboard] Submit failed:', error);
+    if(error.retryable && window.Telegram?.WebApp?.initData){
+      const list = loadPendingScores();
+      list.push({ ...stats, ts: Date.now() });
+      savePendingScores(list);
+    }
   }
 }
 
@@ -1485,7 +1587,102 @@ function handleDone(a){
       updateHud();
       endTurn();
     }
-  } else if(a.kind==='pop') endTurn();
+  } else if(a.kind==='pop' || a.kind==='fx') endTurn();
+}
+
+/* ============ ЭФФЕКТЫ ПАУЭРАПОВ ============ */
+const rgbStr = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (a === undefined ? 1 : a) + ')';
+function fxBurst(a, p){
+  const cx = (p.x + 0.5) * CELL, cy = (p.y + 0.5) * CELL;
+  const n = a.fx === 'firework' ? 12 : a.fx === 'bomb' ? 7 : 5;
+  const col = rgbStr(COLORS[p.color]);
+  for(let i = 0; i < n && a.parts.length < 260; i++){
+    const ang = Math.random() * Math.PI * 2;
+    const base = a.fx === 'bomb' ? 120 : 70, spread = a.fx === 'bomb' ? 200 : 130;
+    const sp = base + Math.random() * spread, life = 0.3 + Math.random() * 0.25;
+    a.parts.push({ x: cx, y: cy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life, max: life,
+                   color: (a.fx === 'bomb' && i % 2) ? 'rgb(255,183,77)' : col, size: 2 + Math.random() * 2.2 });
+  }
+  if(a.fx === 'firework'){ a.hitCount = (a.hitCount || 0) + 1; sfxSparkHit(0.9 + 0.06 * a.hitCount); }
+  else if(a.fx === 'eraser' && (!a.lastPop || a.t - a.lastPop >= 0.035)){ a.lastPop = a.t; sfxPaintPop(Math.min(1, a.t / a.dur)); }
+}
+function updateFx(dt){
+  const a = anim;
+  for(const p of a.pops) if(!p.fired && a.t >= p.hit){ p.fired = true; fxBurst(a, p); }
+  for(const q of a.parts){ q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 120 * dt; }
+  a.parts = a.parts.filter(q => q.life > 0);
+  if(a.fx === 'eraser' && !a.chimed && a.t >= a.dur - 0.22){ a.chimed = true; sfxChime(); }
+}
+function rocketPos(a, p, pr){
+  const e = Math.pow(Math.max(0, Math.min(1, pr)), 1.4);
+  const ex = (p.x + 0.5) * CELL, ey = (p.y + 0.5) * CELL;
+  return { x: a.bx + (ex - a.bx) * e + p.side * Math.sin(Math.PI * e) * 26, y: a.by + (ey - a.by) * e };
+}
+function drawFx(){
+  const a = anim, t = a.t;
+  // стрелки, которые сейчас уничтожаются
+  for(const p of a.pops){
+    const cx = (p.x + 0.5) * CELL, cy = (p.y + 0.5) * CELL;
+    if(a.fx === 'bomb'){
+      const k = Math.min(1, t / a.dur * 1.5), e = 1 - Math.pow(1 - k, 2);
+      const dx = p.x - a.cx, dy = p.y - a.cy, len = Math.hypot(dx, dy);
+      const ux = len ? dx / len : 0, uy = len ? dy / len : -1;
+      drawArrow(cx + ux * CELL * 0.75 * e, cy + uy * CELL * 0.75 * e, CELL * (1 - 0.5 * k), COLORS[p.color], p.dir, p.level, 1 - k);
+    } else if(t < p.hit){
+      const s = a.fx === 'eraser' ? 1 + 0.07 * Math.sin(t * 28 + p.x * 2 + p.y) : 1;
+      drawArrow(cx, cy, CELL * s, COLORS[p.color], p.dir, p.level, 1);
+    } else {
+      const k = Math.min(1, (t - p.hit) / 0.2), pulse = 1 - k;
+      drawArrow(cx, cy, CELL * (0.55 + 0.45 * pulse), COLORS[p.color], p.dir, p.level, pulse * pulse);
+      if(a.fx === 'firework'){   // вспышка попадания
+        ctx.beginPath(); ctx.arc(cx, cy, CELL * (0.2 + 0.45 * k), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,248,210,' + (0.7 * pulse) + ')'; ctx.fill();
+      }
+    }
+  }
+  ctx.save();
+  if(a.fx === 'bomb'){
+    const k = Math.min(1, t / 0.45), cx = (a.cx + 0.5) * CELL, cy = (a.cy + 0.5) * CELL;
+    const r = CELL * (0.5 + 1.5 * k), A = 1 - k;
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gr.addColorStop(0, 'rgba(255,255,235,' + (0.95 * A) + ')');
+    gr.addColorStop(0.4, 'rgba(255,170,60,' + (0.8 * A) + ')');
+    gr.addColorStop(1, 'rgba(255,80,0,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, CELL * (0.3 + 1.9 * k), 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,240,200,' + (0.9 * A) + ')'; ctx.lineWidth = 1 + 4 * A; ctx.stroke();
+  } else if(a.fx === 'eraser'){
+    const cx = (a.cx + 0.5) * CELL, cy = (a.cy + 0.5) * CELL;
+    const k0 = Math.min(1, t / 0.14);
+    if(t < 0.2){   // всплеск краски в точке выбора
+      ctx.beginPath(); ctx.arc(cx, cy, CELL * (0.3 + 0.5 * k0), 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr(COLORS[a.color], 0.5 * (1 - t / 0.2)); ctx.fill();
+    }
+    if(t > 0.12){   // волна цвета
+      const r = (t - 0.12) / 0.075 * CELL, fade = Math.max(0, 1 - (t - 0.12) / 0.6);
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = rgbStr(COLORS[a.color], 0.75 * fade); ctx.lineWidth = 3; ctx.stroke();
+    }
+  } else if(a.fx === 'firework'){
+    for(const p of a.pops){
+      if(t < p.launch || t >= p.hit) continue;
+      const pr = (t - p.launch) / (p.hit - p.launch);
+      for(let j = 5; j >= 1; j--){   // искровой след
+        const q = rocketPos(a, p, pr - 0.045 * j);
+        ctx.beginPath(); ctx.arc(q.x, q.y, 2.6 - j * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,190,90,' + (0.5 - j * 0.08) + ')'; ctx.fill();
+      }
+      const h = rocketPos(a, p, pr);
+      ctx.beginPath(); ctx.arc(h.x, h.y, 5, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,230,150,0.35)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(h.x, h.y, 2.8, 0, Math.PI * 2); ctx.fillStyle = '#fff6c8'; ctx.fill();
+    }
+  }
+  for(const q of a.parts){
+    ctx.globalAlpha = Math.max(0, q.life / q.max);
+    ctx.fillStyle = q.color;
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.size, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
 }
 
 /* ============ POWERUPS ============ */
@@ -1540,7 +1737,9 @@ function applyBomb(cx,cy){
   targeting = null; consumePowerup('bomb');
   addScore(pops.length * 8);
   haptic('heavy');
-  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+  sfxBomb();
+  anim = {active:true, kind:'fx', fx:'bomb', t:0, dur:0.6, cx, cy, parts:[],
+          pops: pops.map(p => ({...p, hit:0, fired:false}))};
 }
 
 function applyEraser(cx,cy){
@@ -1558,7 +1757,14 @@ function applyEraser(cx,cy){
   targetingFromRescue = false; targeting = null; consumePowerup('eraser');
   addScore(pops.length * 8);
   haptic('heavy');
-  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+  sfxPaintSplash();
+  let last = 0;
+  const fxPops = pops.map(p => {
+    const hit = 0.14 + Math.min(0.5, Math.hypot(p.x - cx, p.y - cy) * 0.075);
+    last = Math.max(last, hit);
+    return {...p, hit, fired:false};
+  });
+  anim = {active:true, kind:'fx', fx:'eraser', t:0, dur:last + 0.26, cx, cy, color:target.color, parts:[], pops:fxPops};
   return true;
 }
 
@@ -1579,7 +1785,18 @@ function applyFirework(){
   targetingFromRescue = false; targeting = null; consumePowerup('firework');
   addScore(pops.length * 8);
   haptic('heavy');
-  anim = {active:true, kind:'pop', t:0, dur:0.35, pops};
+  // Ракеты вылетают с кнопки 🎆 и бьют по целям волной: от ближних к дальним
+  const slotW = W / PU_KEYS.length, k = PU_KEYS.indexOf('firework');
+  const bx = slotW * (k + 0.5), by = W + TRAY + PU_ROW / 2 - 18;
+  pops.sort((p, q) => Math.hypot((p.x+0.5)*CELL - bx, (p.y+0.5)*CELL - by) - Math.hypot((q.x+0.5)*CELL - bx, (q.y+0.5)*CELL - by));
+  let last = 0;
+  const fxPops = pops.map((p, i) => {
+    const launch = i * 0.04, hit = launch + 0.3;
+    last = hit;
+    return {...p, launch, hit, side: i % 2 ? 1 : -1, fired:false};
+  });
+  sfxRocketLaunch();
+  anim = {active:true, kind:'fx', fx:'firework', t:0, dur:last + 0.24, bx, by, parts:[], pops:fxPops};
   return true;
 }
 
@@ -1648,6 +1865,7 @@ function draw(){
       const a = board[i]; if(!a) continue;
       drawArrow((i%N+0.5)*CELL, (((i/N)|0)+0.5)*CELL, CELL, COLORS[a.color], a.dir, a.level);
     }
+    if(anim.active && anim.kind==='fx') drawFx();
     if(anim.active && anim.kind==='pop'){
       const k = anim.t/anim.dur;
       for(const p of anim.pops){ const pulse=1-k; drawArrow((p.x+0.5)*CELL, (p.y+0.5)*CELL, CELL*(0.55+0.45*pulse), COLORS[p.color], p.dir, p.level, pulse*pulse); }
@@ -2254,6 +2472,7 @@ function loop(ts){
   lastT = ts;
   if(anim.active){
     anim.t += dt;
+    if(anim.kind === 'fx') updateFx(dt);
     if(anim.t >= anim.dur){
       const done = anim; anim.active = false;
       handleDone(done);
@@ -2266,6 +2485,11 @@ function loop(ts){
 init();
 runLogicTests();
 requestAnimationFrame(loop);
+
+/* ============ ПОВТОРНАЯ ОТПРАВКА СЧЁТА ============ */
+flushPendingScores();
+window.addEventListener('online', flushPendingScores);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) flushPendingScores(); });
 
 /* ============ DAILY / RESUME / TUTORIAL ============ */
 function continueStartup(){
